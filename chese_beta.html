@@ -1,0 +1,2933 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chese — AI Coding Agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = { darkMode: 'class' };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<style>
+  :root{
+    --bg:#0b0d12; --panel:#0f1117; --panel2:#141822; --panel3:#1a1f2e;
+    --border:rgba(255,255,255,.07); --accent:#7c5cff;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;padding:0}
+  body{
+    font-family:'Inter',system-ui,-apple-system,sans-serif;
+    background:var(--bg); color:#cbd5e1; overflow:hidden;
+  }
+  code,pre,.mono{font-family:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace}
+
+  /* scrollbars */
+  .scroll::-webkit-scrollbar{width:10px;height:10px}
+  .scroll::-webkit-scrollbar-track{background:transparent}
+  .scroll::-webkit-scrollbar-thumb{background:#252b3b;border-radius:8px;border:2px solid transparent;background-clip:content-box}
+  .scroll::-webkit-scrollbar-thumb:hover{background:#39415a;background-clip:content-box}
+
+  /* tree */
+  .tree-row{display:flex;align-items:center;gap:6px;height:24px;padding-right:8px;font-size:12.5px;
+    color:#93a0b8;cursor:pointer;user-select:none;border-radius:5px;margin:0 4px;position:relative}
+  .tree-row:hover{background:rgba(255,255,255,.045);color:#dbe3f0}
+  .tree-row.active{background:rgba(124,92,255,.16);color:#e6e9f5}
+  .tree-row.active::before{content:"";position:absolute;left:-4px;top:3px;bottom:3px;width:2px;border-radius:2px;background:var(--accent)}
+  .chev{width:12px;height:12px;flex:0 0 12px;transition:transform .15s ease;opacity:.6}
+  .chev.open{transform:rotate(90deg)}
+  .dot{width:7px;height:7px;border-radius:2px;flex:0 0 7px}
+
+  /* tabs */
+  .tab{display:flex;align-items:center;gap:6px;height:100%;padding:0 10px;font-size:12px;color:#8b97ad;
+    border-right:1px solid var(--border);cursor:pointer;white-space:nowrap;position:relative;transition:background .12s}
+  .tab:hover{background:rgba(255,255,255,.03);color:#c7d2e3}
+  .tab.active{background:var(--bg);color:#e8ecf6}
+  .tab.active::after{content:"";position:absolute;left:0;right:0;top:0;height:1.5px;background:linear-gradient(90deg,#7c5cff,#5b8cff)}
+  .tab-x{opacity:0;font-size:10px;padding:2px 3px;border-radius:4px;transition:.12s}
+  .tab:hover .tab-x{opacity:.55}
+  .tab-x:hover{opacity:1;background:rgba(255,255,255,.1)}
+
+  /* buttons */
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:7px;font-size:12px;font-weight:500;
+    border:1px solid var(--border);background:rgba(255,255,255,.03);color:#b9c4d6;cursor:pointer;transition:.14s;white-space:nowrap}
+  .btn:hover{background:rgba(255,255,255,.075);color:#eef2fa;border-color:rgba(255,255,255,.13)}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn-primary{background:linear-gradient(180deg,#7c5cff,#6a48f5);border-color:#8368ff;color:#fff;
+    box-shadow:0 2px 12px -3px rgba(124,92,255,.6)}
+  .btn-primary:hover{background:linear-gradient(180deg,#8b6dff,#7757ff);color:#fff}
+  .btn-ghost{background:transparent;border-color:transparent}
+  .btn-ghost:hover{background:rgba(255,255,255,.06)}
+  .icon-btn{width:28px;height:28px;display:grid;place-items:center;border-radius:6px;color:#7f8ba1;cursor:pointer;transition:.14s;border:none;background:transparent}
+  .icon-btn:hover{background:rgba(255,255,255,.07);color:#dfe6f2}
+
+  .opbtn{font-size:11px;padding:3px 9px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,.04);
+    color:#a9b5c9;cursor:pointer;transition:.14s}
+  .opbtn:hover{background:rgba(255,255,255,.1);color:#fff}
+
+  /* chat */
+  .msg-body p{margin:0 0 .45rem}
+  .msg-body p:last-child{margin-bottom:0}
+  .msg-body ul{margin:.15rem 0 .5rem;padding-left:1.05rem;list-style:disc}
+  .msg-body li{margin:.1rem 0}
+  .msg-body strong{color:#e8ecf6;font-weight:600}
+  .msg-body .md-h{font-weight:600;color:#eef2fa;margin:.6rem 0 .3rem;font-size:13.5px}
+  .ic{background:rgba(124,92,255,.14);color:#c3b4ff;padding:1px 5px;border-radius:4px;font-size:11.5px;border:1px solid rgba(124,92,255,.18)}
+  .cb{margin:.5rem 0;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#0a0c11}
+  .cb-h{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#66708a;padding:4px 9px;background:rgba(255,255,255,.025);border-bottom:1px solid var(--border)}
+  .cb pre{margin:0;padding:9px 11px;overflow-x:auto;font-size:11.8px;line-height:1.55;color:#c3cede}
+
+  .op-card{margin-top:8px;border:1px solid var(--border);background:rgba(255,255,255,.022);border-radius:9px;padding:9px 11px;
+    animation:fadeUp .22s ease}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+  .live-chip{display:inline-flex;align-items:center;gap:6px;margin-top:7px;font-size:11.5px;color:#a99bff;
+    background:rgba(124,92,255,.09);border:1px solid rgba(124,92,255,.22);padding:3px 9px;border-radius:20px}
+  .cursor-blink{display:inline-block;animation:blink 1s steps(1) infinite;color:#7c5cff}
+  @keyframes blink{50%{opacity:0}}
+
+  /* toast */
+  .toast{display:flex;align-items:flex-start;gap:9px;min-width:230px;max-width:380px;padding:10px 13px;border-radius:9px;
+    background:#171c29;border:1px solid rgba(255,255,255,.09);box-shadow:0 12px 32px -12px rgba(0,0,0,.85);
+    font-size:12.5px;color:#d3daea;animation:slideIn .26s cubic-bezier(.2,.9,.3,1.2)}
+  @keyframes slideIn{from{opacity:0;transform:translateX(24px) scale(.97)}to{opacity:1;transform:none}}
+  .toast.out{animation:slideOut .22s ease forwards}
+  @keyframes slideOut{to{opacity:0;transform:translateX(24px)}}
+
+  textarea{resize:none}
+  .fade-in{animation:fadeUp .25s ease}
+  select{background-image:none}
+  input,select,textarea{outline:none}
+  input:focus,select:focus,textarea:focus{border-color:rgba(124,92,255,.55)!important;box-shadow:0 0 0 3px rgba(124,92,255,.12)}
+  .glow{position:absolute;pointer-events:none;filter:blur(90px);opacity:.16}
+
+  /* effort button */
+  .effort-btn{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:7px;font-size:11px;font-weight:600;
+    border:1px solid var(--border);cursor:pointer;transition:.14s;letter-spacing:.03em;white-space:nowrap;user-select:none}
+  .effort-btn:hover{filter:brightness(1.15)}
+  .effort-auto  {background:rgba(148,163,184,.09);border-color:rgba(148,163,184,.25);color:#94a3b8}
+  .effort-low   {background:rgba(99,202,255,.08);border-color:rgba(99,202,255,.28);color:#67d5fb}
+  .effort-medium{background:rgba(251,191,36,.08);border-color:rgba(251,191,36,.28);color:#fbbf24}
+  .effort-high  {background:rgba(251,146,60,.09);border-color:rgba(251,146,60,.28);color:#fb923c}
+  .effort-xhigh {background:rgba(244,63,94,.08);border-color:rgba(244,63,94,.28);color:#fb7185}
+  .effort-max   {background:rgba(167,139,250,.11);border-color:rgba(167,139,250,.35);color:#c4b5fd}
+  html:not(.dark) .effort-auto  {background:rgba(100,116,139,.07);border-color:rgba(100,116,139,.2);color:#64748b}
+  html:not(.dark) .effort-low   {background:rgba(14,165,233,.07);border-color:rgba(14,165,233,.25);color:#0284c7}
+  html:not(.dark) .effort-medium{background:rgba(217,119,6,.07);border-color:rgba(217,119,6,.25);color:#b45309}
+  html:not(.dark) .effort-high  {background:rgba(234,88,12,.07);border-color:rgba(234,88,12,.25);color:#c2410c}
+  html:not(.dark) .effort-xhigh {background:rgba(220,38,38,.07);border-color:rgba(220,38,38,.25);color:#dc2626}
+  html:not(.dark) .effort-max   {background:rgba(124,58,237,.07);border-color:rgba(124,58,237,.25);color:#7c3aed}
+
+  /* chese sync pill */
+  .sync-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:20px;font-size:11px;
+    background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:#8b97ad;transition:.15s}
+  .sync-pill.ok{background:rgba(52,211,153,.08);border-color:rgba(52,211,153,.3);color:#6ee7b7}
+  .sync-pill.err{background:rgba(244,63,94,.08);border-color:rgba(244,63,94,.3);color:#fda4af}
+  .sync-pill.busy{background:rgba(124,92,255,.08);border-color:rgba(124,92,255,.3);color:#c4b5fd}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .spinning{animation:spin .9s linear infinite}
+
+  /* ============ LIGHT MODE ============ */
+  html:not(.dark){
+    --bg:#f0f2f5; --panel:#ffffff; --panel2:#f7f8fa; --panel3:#eff0f2;
+    --border:rgba(0,0,0,.09); --accent:#7c5cff;
+  }
+  html:not(.dark) body{color:#374151;}
+  html:not(.dark) .text-slate-100{color:#111827!important;}
+  html:not(.dark) .text-slate-200{color:#1f2937!important;}
+  html:not(.dark) .text-slate-300{color:#374151!important;}
+  html:not(.dark) .text-slate-400{color:#4b5563!important;}
+  html:not(.dark) .text-slate-500{color:#6b7280!important;}
+  html:not(.dark) .text-slate-600{color:#9ca3af!important;}
+  html:not(.dark) .text-violet-400{color:#7c3aed!important;}
+  html:not(.dark) .text-emerald-300{color:#059669!important;}
+  html:not(.dark) .text-rose-300{color:#dc2626!important;}
+  html:not(.dark) .text-amber-300{color:#d97706!important;}
+  html:not(.dark) .text-sky-300{color:#0284c7!important;}
+  html:not(.dark) .text-amber-400{color:#d97706!important;}
+  html:not(.dark) .text-emerald-400{color:#059669!important;}
+  html:not(.dark) .text-rose-400{color:#dc2626!important;}
+  html:not(.dark) .text-rose-300{color:#dc2626!important;}
+  /* white-tinted utility overrides */
+  html:not(.dark) [class*="bg-white/"]{background-color:rgba(0,0,0,.04)!important;}
+  html:not(.dark) [class*="border-white/"]{border-color:rgba(0,0,0,.12)!important;}
+  /* component overrides */
+  html:not(.dark) .btn{color:#374151;border-color:rgba(0,0,0,.14);background:rgba(0,0,0,.03);}
+  html:not(.dark) .btn:hover{background:rgba(0,0,0,.07);color:#111827;border-color:rgba(0,0,0,.18);}
+  html:not(.dark) .btn:disabled{opacity:.4;}
+  html:not(.dark) .icon-btn{color:#6b7280;}
+  html:not(.dark) .icon-btn:hover{background:rgba(0,0,0,.07);color:#374151;}
+  html:not(.dark) .opbtn{color:#374151;border-color:rgba(0,0,0,.12);background:rgba(0,0,0,.04);}
+  html:not(.dark) .opbtn:hover{background:rgba(0,0,0,.1);color:#111827;}
+  html:not(.dark) .tree-row{color:#4b5563;}
+  html:not(.dark) .tree-row:hover{background:rgba(0,0,0,.05);color:#111827;}
+  html:not(.dark) .tree-row.active{background:rgba(124,92,255,.12);color:#1e1b4b;}
+  html:not(.dark) .tab{color:#6b7280;}
+  html:not(.dark) .tab:hover{background:rgba(0,0,0,.04);color:#374151;}
+  html:not(.dark) .tab.active{background:var(--bg);color:#111827;}
+  html:not(.dark) .toast{background:#fff;border-color:rgba(0,0,0,.12);color:#374151;box-shadow:0 8px 24px -8px rgba(0,0,0,.2);}
+  html:not(.dark) .ic{background:rgba(124,92,255,.08);color:#5b21b6;border-color:rgba(124,92,255,.22);}
+  html:not(.dark) .cb{background:#f8f9fa;border-color:rgba(0,0,0,.1);}
+  html:not(.dark) .cb-h{background:rgba(0,0,0,.04);color:#6b7280;border-color:rgba(0,0,0,.08);}
+  html:not(.dark) .cb pre{color:#374151;}
+  html:not(.dark) .msg-body{color:#374151;}
+  html:not(.dark) .msg-body strong{color:#111827;}
+  html:not(.dark) .op-card{background:rgba(0,0,0,.025);border-color:rgba(0,0,0,.09);}
+  html:not(.dark) .sync-pill{background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.1);color:#6b7280;}
+  html:not(.dark) .sync-pill.ok{background:rgba(5,150,105,.08);border-color:rgba(5,150,105,.3);color:#059669;}
+  html:not(.dark) .sync-pill.err{background:rgba(220,38,38,.08);border-color:rgba(220,38,38,.3);color:#dc2626;}
+  html:not(.dark) .sync-pill.busy{background:rgba(124,92,255,.08);border-color:rgba(124,92,255,.3);color:#7c3aed;}
+  html:not(.dark) .live-chip{color:#7c3aed;background:rgba(124,92,255,.08);border-color:rgba(124,92,255,.2);}
+  html:not(.dark) .scroll::-webkit-scrollbar-thumb{background:#d1d5db;border-color:transparent;}
+  html:not(.dark) .scroll::-webkit-scrollbar-thumb:hover{background:#9ca3af;}
+  html:not(.dark) footer{color:#6b7280!important;}
+  html:not(.dark) textarea::placeholder{color:#9ca3af!important;}
+  html:not(.dark) input::placeholder{color:#9ca3af!important;}
+  html:not(.dark) select option{background:#fff;color:#374151;}
+  html:not(.dark) #settings-modal,html:not(.dark) #diff-modal,html:not(.dark) #history-modal{background:rgba(0,0,0,.4)!important;}
+
+  /* ============ CONSOLE PANEL ============ */
+  .console-line{display:flex;gap:8px;padding:1.5px 0;min-width:0;}
+  .console-line-log  {color:#c3cede;}
+  .console-line-warn {color:#f0a868;}
+  .console-line-error{color:#f06060;}
+  .console-line-info {color:#7fb8ff;}
+  .console-line-success{color:#34d399;}
+  html:not(.dark) .console-line-log  {color:#374151;}
+  html:not(.dark) .console-line-warn {color:#b45309;}
+  html:not(.dark) .console-line-error{color:#dc2626;}
+  html:not(.dark) .console-line-info {color:#2563eb;}
+  html:not(.dark) .console-line-success{color:#059669;}
+  .console-ts{color:#3d4a60;font-size:10.5px;flex-shrink:0;opacity:.55;line-height:1.7;user-select:none;}
+  html:not(.dark) .console-ts{color:#9ca3af;}
+  .console-prefix{flex-shrink:0;width:15px;text-align:center;opacity:.7;line-height:1.7;}
+  .console-text{flex:1;white-space:pre-wrap;word-break:break-all;min-width:0;line-height:1.7;}
+  #console-resize-handle:hover{background:rgba(124,92,255,.3)!important;}
+  #btn-run.running svg{animation:spin .7s linear infinite;}
+  #btn-run{transition:all .14s;}
+
+  /* ============ THEME TRANSITIONS ============ */
+  body,header,footer,aside,main,.btn,.tab,.tree-row,.toast,.op-card,
+  .cb,.opbtn,.icon-btn,.sync-pill,.msg-body,#console-panel,#console-output,
+  .console-line,.live-chip,.ic,.cb-h{
+    transition:background-color .18s ease,border-color .18s ease,color .18s ease;
+  }
+  /* keep animation-only transitions clean */
+  .spinning,.cursor-blink,.tab-x,.fade-in{transition:none!important;}
+  .chev{transition:transform .15s ease!important;}
+  #btn-theme svg{transition:opacity .15s ease;}
+</style>
+</head>
+<body>
+
+<div class="flex flex-col h-screen w-screen">
+
+  <!-- ============ TOP BAR ============ -->
+  <header class="h-12 shrink-0 flex items-center gap-2 px-3 border-b" style="border-color:var(--border);background:var(--panel)">
+    <div class="flex items-center gap-2 pr-2 select-none">
+      <div class="w-7 h-7 rounded-lg grid place-items-center text-white font-black text-[13px]"
+           style="background:linear-gradient(135deg,#8b6dff,#4f7dff);box-shadow:0 3px 14px -4px rgba(124,92,255,.85)">C</div>
+      <span class="font-semibold tracking-tight text-slate-100 text-[15px]">Chese</span>
+      <span class="text-[9px] px-1.5 py-[2px] rounded border border-white/10 bg-white/5 text-slate-400 tracking-wide">BETA</span>
+    </div>
+
+    <div class="w-px h-5 bg-white/8"></div>
+
+    <!-- model selector -->
+    <div class="flex items-center gap-1.5 min-w-0">
+      <span class="text-[11px] text-slate-500 hidden md:inline">Model</span>
+      <select id="model-select"
+        class="text-[12px] bg-white/[.04] border border-white/10 rounded-md px-2 py-1.5 text-slate-300 max-w-[230px] cursor-pointer hover:bg-white/[.07] transition">
+        <option value="">— no model —</option>
+      </select>
+    </div>
+
+    <!-- effort selector -->
+    <div class="flex items-center gap-1.5">
+      <span class="text-[11px] text-slate-500 hidden md:inline">Effort</span>
+      <button id="effort-btn" class="effort-btn effort-auto" title="Reasoning effort — click to cycle&#10;auto → low → medium → high → xhigh → max&#10;Injects the right API param for your model">
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" id="effort-icon-brain" style="opacity:.7">
+          <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-1.07-4.13A3 3 0 0 1 4.5 9.5a3 3 0 0 1 5-2.25"/>
+          <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 1.07-4.13A3 3 0 0 0 19.5 9.5a3 3 0 0 0-5-2.25"/>
+        </svg>
+        <span id="effort-label">auto</span>
+      </button>
+    </div>
+
+    <div class="flex-1"></div>
+
+    <div class="flex items-center gap-1">
+      <!-- Chese Load / Save -->
+      <button id="btn-chese-load" class="btn btn-primary" title="Load chese.json from Google Drive — restores settings, model list, chat history">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V9m0 0l-3 3m3-3l3 3"/><path d="M20 16.6A4.5 4.5 0 0018 8h-1.3A7 7 0 104 15"/></svg>
+        <span>Chese Load</span>
+      </button>
+      <button id="btn-chese-save" class="btn btn-ghost" title="Save chese.json to Google Drive (archive settings, API keys, chat memory)">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V7m0 0l-3 3m3-3l3 3"/><path d="M20 16.6A4.5 4.5 0 0018 8h-1.3A7 7 0 104 15"/></svg>
+        <span class="hidden xl:inline">Chese Save</span>
+      </button>
+      <div id="chese-sync-pill" class="sync-pill hidden md:inline-flex" title="Chese archive sync status">
+        <span class="w-[6px] h-[6px] rounded-full bg-slate-500"></span>
+        <span id="chese-sync-text">not linked</span>
+      </div>
+
+      <div class="w-px h-5 bg-white/8 mx-1"></div>
+
+      <button id="btn-new-chat" class="btn btn-ghost" title="New chat (Ctrl+Shift+N)">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        <span class="hidden lg:inline">New Chat</span>
+      </button>
+      <button id="btn-history" class="btn btn-ghost" title="Chat history">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="9"/></svg>
+        <span class="hidden lg:inline">History</span>
+      </button>
+      <button id="btn-zip" class="btn btn-ghost" title="Download project as ZIP">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+        <span class="hidden xl:inline">Export</span>
+      </button>
+      <button id="btn-settings" class="btn" title="Settings">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-2.9 1.2 2 2 0 11-4 0 1.7 1.7 0 00-2.9-1.2l-.1.1a2 2 0 11-2.8-2.8l.1-.1A1.7 1.7 0 003 15a2 2 0 010-4 1.7 1.7 0 001.2-2.9l-.1-.1a2 2 0 112.8-2.8l.1.1A1.7 1.7 0 009 4.6a2 2 0 014 0 1.7 1.7 0 002.9 1.2l.1-.1a2 2 0 112.8 2.8l-.1.1A1.7 1.7 0 0021 11a2 2 0 010 4z"/></svg>
+        <span class="hidden md:inline">Settings</span>
+      </button>
+
+      <!-- Theme toggle -->
+      <button id="btn-theme" class="icon-btn" title="Toggle light / dark mode">
+        <!-- Sun – visible in dark mode, click to go light -->
+        <svg id="theme-sun" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <circle cx="12" cy="12" r="5"/>
+          <line x1="12" y1="1"  x2="12" y2="3"/>
+          <line x1="12" y1="21" x2="12" y2="23"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1"  y1="12" x2="3"  y2="12"/>
+          <line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+        <!-- Moon – visible in light mode, click to go dark -->
+        <svg id="theme-moon" class="hidden" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ============ MAIN ============ -->
+  <div class="flex-1 flex min-h-0">
+
+    <!-- ---------- SIDEBAR ---------- -->
+    <aside id="sidebar" class="w-[248px] shrink-0 flex flex-col min-h-0 border-r" style="border-color:var(--border);background:var(--panel)">
+      <div class="h-9 shrink-0 flex items-center px-3 gap-1 border-b" style="border-color:var(--border)">
+        <span class="text-[10.5px] font-semibold tracking-[.09em] text-slate-500 uppercase">Explorer</span>
+        <div class="flex-1"></div>
+        <button id="btn-new-file" class="icon-btn" title="New file">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M12 12v6M9 15h6"/></svg>
+        </button>
+        <button id="btn-refresh" class="icon-btn" title="Refresh">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 11-3-6.7M21 3v6h-6"/></svg>
+        </button>
+      </div>
+
+      <div id="filetree" class="flex-1 overflow-y-auto scroll py-1.5 min-h-0"></div>
+
+      <div class="shrink-0 border-t p-2 space-y-1.5" style="border-color:var(--border)">
+        <div class="text-[10px] uppercase tracking-[.09em] text-slate-600 px-1 pb-0.5">Workspace</div>
+        <button id="btn-open-folder" class="btn w-full justify-center">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+          Open Folder
+        </button>
+        <button id="btn-connect-drive" class="btn w-full justify-center">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3l9 15.5H3z"/></svg>
+          Connect Google Drive
+        </button>
+      </div>
+    </aside>
+
+    <!-- ---------- EDITOR ---------- -->
+    <main class="flex-1 flex flex-col min-w-0 min-h-0" style="background:var(--bg)">
+      <!-- Editor toolbar: tabs + run button + console toggle -->
+      <div class="shrink-0 flex items-stretch border-b" style="border-color:var(--border);background:var(--panel)">
+        <div id="tabs" class="h-9 flex items-stretch overflow-x-auto scroll flex-1 min-w-0"></div>
+        <div class="flex items-center gap-1 px-2 shrink-0 border-l" style="border-color:var(--border)">
+          <button id="btn-run"
+            class="btn !py-1 !px-2.5 !text-[11px] !font-semibold"
+            style="color:#34d399;border-color:rgba(52,211,153,.25);background:rgba(52,211,153,.07)"
+            title="Run file (Ctrl+R)">
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5,3 19,12 5,21"/></svg>
+            Run
+          </button>
+          <button id="btn-toggle-console" class="icon-btn" title="Toggle console (Ctrl+\`)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="4 17 10 11 4 5"/>
+              <line x1="12" y1="19" x2="20" y2="19"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="flex-1 min-h-0 relative">
+        <div id="editor" class="absolute inset-0"></div>
+        <div id="editor-loading" class="absolute inset-0 grid place-items-center text-slate-600 text-xs">Loading editor…</div>
+        <div id="welcome" class="absolute inset-0 grid place-items-center px-6">
+          <div class="text-center max-w-md relative">
+            <div class="glow" style="width:340px;height:200px;background:#7c5cff;left:50%;top:-30px;transform:translateX(-50%)"></div>
+            <div class="w-14 h-14 mx-auto rounded-2xl grid place-items-center text-white text-xl font-black mb-4 relative"
+                 style="background:linear-gradient(135deg,#8b6dff,#4f7dff);box-shadow:0 8px 34px -8px rgba(124,92,255,.9)">C</div>
+            <h2 class="text-slate-200 font-semibold text-lg mb-1 relative">Welcome to Chese</h2>
+            <p class="text-[12.5px] text-slate-500 leading-relaxed mb-5 relative">
+              Your browser-native AI coding agent. Open a folder or connect Google Drive, configure your model, then describe what you want to build.
+            </p>
+            <div class="flex flex-wrap gap-2 justify-center relative">
+              <button class="btn btn-primary" onclick="document.getElementById('btn-settings').click()">Configure AI</button>
+              <button class="btn" onclick="document.getElementById('btn-open-folder').click()">Open Folder</button>
+              <button class="btn" onclick="document.getElementById('btn-new-file').click()">Create File</button>
+            </div>
+            <div class="mt-7 grid grid-cols-2 gap-2 text-left relative">
+              <div class="border rounded-lg p-2.5" style="border-color:var(--border);background:rgba(255,255,255,.02)">
+                <div class="text-[11px] text-slate-400 font-medium mb-1">⌘/Ctrl + S</div>
+                <div class="text-[10.5px] text-slate-600">Save current file</div>
+              </div>
+              <div class="border rounded-lg p-2.5" style="border-color:var(--border);background:rgba(255,255,255,.02)">
+                <div class="text-[11px] text-slate-400 font-medium mb-1">⌘/Ctrl + Enter</div>
+                <div class="text-[10.5px] text-slate-600">Send message to agent</div>
+              </div>
+              <div class="border rounded-lg p-2.5" style="border-color:var(--border);background:rgba(255,255,255,.02)">
+                <div class="text-[11px] text-slate-400 font-medium mb-1">⌘/Ctrl + B</div>
+                <div class="text-[10.5px] text-slate-600">Toggle file explorer</div>
+              </div>
+              <div class="border rounded-lg p-2.5" style="border-color:var(--border);background:rgba(255,255,255,.02)">
+                <div class="text-[11px] text-slate-400 font-medium mb-1">⌘/Ctrl + J</div>
+                <div class="text-[10.5px] text-slate-600">Toggle chat panel</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ CONSOLE PANEL ============ -->
+      <div id="console-panel" class="flex-col shrink-0 border-t"
+           style="display:none;height:220px;min-height:80px;max-height:55vh;
+                  border-color:var(--border);background:var(--panel)">
+        <!-- Resize handle -->
+        <div id="console-resize-handle"
+             class="w-full shrink-0 cursor-ns-resize"
+             style="height:5px;background:var(--border)"
+             title="Drag to resize console"></div>
+        <!-- Console header -->
+        <div class="h-8 shrink-0 flex items-center px-3 gap-2 border-b" style="border-color:var(--border)">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-slate-500 shrink-0">
+            <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
+          </svg>
+          <span class="text-[10.5px] font-semibold tracking-[.09em] text-slate-500 uppercase shrink-0">Console</span>
+          <span id="console-run-file" class="text-[10px] text-slate-600 truncate flex-1 min-w-0"></span>
+          <button id="btn-console-clear" class="opbtn !text-[10px] !py-[2px] !px-[7px] shrink-0">Clear</button>
+          <button id="btn-console-close" class="icon-btn shrink-0" title="Close">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+        <!-- Output area -->
+        <div id="console-output" class="flex-1 overflow-y-auto scroll px-3 py-2 min-h-0"
+             style="font-family:'JetBrains Mono',monospace;font-size:11.5px;"></div>
+        <!-- Hidden sandbox iframe -->
+        <iframe id="run-iframe" sandbox="allow-scripts"
+                style="display:none;width:0;height:0;border:none;" title="Code runner"></iframe>
+      </div>
+    </main>
+
+    <!-- ---------- CHAT ---------- -->
+    <aside id="chatpane" class="w-[400px] shrink-0 flex flex-col min-h-0 border-l" style="border-color:var(--border);background:var(--panel)">
+      <div class="h-9 shrink-0 flex items-center px-3 gap-2 border-b" style="border-color:var(--border)">
+        <span class="text-[10.5px] font-semibold tracking-[.09em] text-slate-500 uppercase">Agent</span>
+        <div class="flex-1"></div>
+        <label class="flex items-center gap-1.5 cursor-pointer select-none" title="Automatically apply file edits as they stream in">
+          <input id="autoapply" type="checkbox" class="accent-violet-500 w-3 h-3 cursor-pointer">
+          <span class="text-[10.5px] text-slate-500">Auto-apply</span>
+        </label>
+        <button id="btn-clear-chat" class="icon-btn" title="Clear conversation">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
+        </button>
+      </div>
+
+      <div id="messages" class="flex-1 overflow-y-auto scroll px-3.5 py-4 min-h-0"></div>
+
+      <div class="shrink-0 border-t p-2.5" style="border-color:var(--border)">
+        <div class="rounded-xl border overflow-hidden transition" style="border-color:rgba(255,255,255,.09);background:var(--panel2)">
+          <textarea id="chat-input" rows="1" placeholder="Describe what to build, or ask a question…"
+            class="w-full bg-transparent px-3 pt-2.5 pb-1 text-[13px] text-slate-200 placeholder-slate-600 scroll"
+            style="max-height:190px"></textarea>
+          <div class="flex items-center gap-1 px-2 pb-2">
+            <span id="ctx-hint" class="text-[10px] text-slate-600 truncate flex-1"></span>
+            <button id="btn-stop" class="btn !py-1 !px-2.5 hidden text-rose-300 border-rose-500/25 bg-rose-500/10">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+              Stop
+            </button>
+            <button id="btn-send" class="btn btn-primary !py-1 !px-3">
+              <span class="text-[12px]">Send</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ============ STATUS BAR ============ -->
+  <footer class="h-[26px] shrink-0 flex items-center gap-3 px-3 text-[11px] border-t"
+          style="border-color:var(--border);background:var(--panel);color:#6b7690">
+    <div class="flex items-center gap-1.5">
+      <span id="conn-dot" class="w-[7px] h-[7px] rounded-full bg-slate-600"></span>
+      <span id="conn-text">Disconnected</span>
+    </div>
+    <div class="w-px h-3 bg-white/8"></div>
+    <div class="flex items-center gap-1.5 min-w-0">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l9 6-9 6-9-6z"/><path d="M3 15l9 6 9-6"/></svg>
+      <span id="status-model" class="truncate max-w-[220px]">no model</span>
+    </div>
+    <div class="w-px h-3 bg-white/8"></div>
+    <div id="status-fs">virtual fs</div>
+    <div class="w-px h-3 bg-white/8"></div>
+    <div id="status-archive" class="text-slate-500">archive: —</div>
+    <div class="flex-1"></div>
+    <div id="status-cursor"></div>
+    <div class="w-px h-3 bg-white/8"></div>
+    <div id="status-file" class="truncate max-w-[280px]">—</div>
+    <div class="w-px h-3 bg-white/8"></div>
+    <div id="status-save" class="text-slate-500">saved</div>
+  </footer>
+</div>
+
+<!-- ============ SETTINGS MODAL ============ -->
+<div id="settings-modal" class="hidden fixed inset-0 z-50 bg-black/65 backdrop-blur-[3px] items-center justify-center p-4">
+  <div class="w-full max-w-lg rounded-2xl border overflow-hidden fade-in" style="border-color:rgba(255,255,255,.1);background:var(--panel);box-shadow:0 30px 80px -20px rgba(0,0,0,.9)">
+    <div class="h-12 flex items-center px-4 border-b" style="border-color:var(--border)">
+      <span class="font-semibold text-slate-200 text-[13.5px]">AI Manager</span>
+      <div class="flex-1"></div>
+      <button id="set-close" class="icon-btn">✕</button>
+    </div>
+
+    <div class="p-4 space-y-4 max-h-[70vh] overflow-y-auto scroll">
+      <div>
+        <label class="block text-[11px] font-medium text-slate-400 mb-1.5">Base URL</label>
+        <input id="set-base" type="text" placeholder="https://openrouter.ai/api/v1"
+          class="w-full rounded-lg border px-3 py-2 text-[12.5px] text-slate-200 bg-white/[.03] border-white/10 font-mono">
+        <p class="text-[10.5px] text-slate-600 mt-1.5">Any OpenAI-compatible endpoint: OpenRouter, OpenAI, Groq, Together, Ollama, LM Studio, vLLM…</p>
+        <div class="flex flex-wrap gap-1.5 mt-2">
+          <button class="btn !py-1 !px-2 !text-[10.5px] preset" data-base="https://openrouter.ai/api/v1">OpenRouter</button>
+          <button class="btn !py-1 !px-2 !text-[10.5px] preset" data-base="https://api.openai.com/v1">OpenAI</button>
+          <button class="btn !py-1 !px-2 !text-[10.5px] preset" data-base="https://api.groq.com/openai/v1">Groq</button>
+          <button class="btn !py-1 !px-2 !text-[10.5px] preset" data-base="https://api.together.xyz/v1">Together</button>
+          <button class="btn !py-1 !px-2 !text-[10.5px] preset" data-base="http://localhost:11434/v1">Ollama</button>
+          <button class="btn !py-1 !px-2 !text-[10.5px] preset" data-base="http://localhost:1234/v1">LM Studio</button>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-[11px] font-medium text-slate-400 mb-1.5">API Key</label>
+        <div class="flex gap-2">
+          <input id="set-key" type="password" placeholder="sk-..."
+            class="flex-1 rounded-lg border px-3 py-2 text-[12.5px] text-slate-200 bg-white/[.03] border-white/10 font-mono">
+          <button id="set-key-toggle" class="btn">Show</button>
+        </div>
+        <p class="text-[10.5px] text-slate-600 mt-1.5">Stored only in your browser's localStorage. Requests go directly from your browser to the endpoint.</p>
+      </div>
+
+      <div>
+        <label class="block text-[11px] font-medium text-slate-400 mb-1.5">Model</label>
+        <div class="flex gap-2">
+          <input id="set-model" type="text" placeholder="e.g. anthropic/claude-3.5-sonnet"
+            class="flex-1 rounded-lg border px-3 py-2 text-[12.5px] text-slate-200 bg-white/[.03] border-white/10 font-mono">
+          <button id="set-fetch" class="btn whitespace-nowrap">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 11-3-6.7M21 3v6h-6"/></svg>
+            Fetch Models
+          </button>
+        </div>
+        <select id="set-model-list" class="hidden w-full mt-2 rounded-lg border px-3 py-2 text-[12px] text-slate-300 bg-white/[.03] border-white/10"></select>
+        <p id="set-model-status" class="text-[10.5px] text-slate-600 mt-1.5"></p>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-[11px] font-medium text-slate-400 mb-1.5">Temperature</label>
+          <input id="set-temp" type="number" min="0" max="2" step="0.1"
+            class="w-full rounded-lg border px-3 py-2 text-[12.5px] text-slate-200 bg-white/[.03] border-white/10">
+        </div>
+        <div>
+          <label class="block text-[11px] font-medium text-slate-400 mb-1.5">Apply mode</label>
+          <select id="set-autoapply" class="w-full rounded-lg border px-3 py-2 text-[12.5px] text-slate-300 bg-white/[.03] border-white/10">
+            <option value="true">Auto-apply edits</option>
+            <option value="false">Review before applying</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="pt-3 border-t" style="border-color:var(--border)">
+        <label class="block text-[11px] font-medium text-slate-400 mb-1.5">Google OAuth Client ID <span class="text-slate-600">(for Drive mode + chese.json archive)</span></label>
+        <input id="set-gcid" type="text" placeholder="xxxxxxxx.apps.googleusercontent.com"
+          class="w-full rounded-lg border px-3 py-2 text-[12.5px] text-slate-200 bg-white/[.03] border-white/10 font-mono">
+        <p class="text-[10.5px] text-slate-600 mt-1.5">Create an OAuth 2.0 Web Client ID in Google Cloud Console and add this page's origin as an authorized JavaScript origin.</p>
+      </div>
+
+      <div class="pt-3 border-t" style="border-color:var(--border)">
+        <div class="flex items-center justify-between mb-2">
+          <label class="block text-[11px] font-medium text-slate-400">Chese Archive (chese.json in Drive)</label>
+          <label class="flex items-center gap-1.5 cursor-pointer select-none">
+            <input id="set-autosave" type="checkbox" class="accent-violet-500 w-3 h-3 cursor-pointer">
+            <span class="text-[10.5px] text-slate-500">Auto-save</span>
+          </label>
+        </div>
+        <p class="text-[10.5px] text-slate-600 mb-2">Archives your settings, API keys, model list, and AI memory (chat history) to a single <code class="ic">chese.json</code> file in your Google Drive. Load it back with one click from any browser.</p>
+        <div class="flex gap-2">
+          <button id="set-archive-save" class="btn flex-1 justify-center">Save archive now</button>
+          <button id="set-archive-load" class="btn flex-1 justify-center">Load archive now</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="h-14 flex items-center px-4 gap-2 border-t" style="border-color:var(--border)">
+      <button id="set-clear" class="btn text-rose-300 border-rose-500/25 bg-rose-500/5 hover:bg-rose-500/12">Clear Credentials</button>
+      <div class="flex-1"></div>
+      <button id="set-cancel" class="btn">Cancel</button>
+      <button id="set-save" class="btn btn-primary">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ DIFF MODAL ============ -->
+<div id="diff-modal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-[3px] items-center justify-center p-5">
+  <div class="w-full max-w-6xl h-[82vh] rounded-2xl border flex flex-col overflow-hidden fade-in"
+       style="border-color:rgba(255,255,255,.1);background:var(--panel);box-shadow:0 30px 80px -20px rgba(0,0,0,.9)">
+    <div class="h-11 shrink-0 flex items-center px-4 gap-3 border-b" style="border-color:var(--border)">
+      <span class="text-[12.5px] font-medium text-slate-300" id="diff-title">Diff</span>
+      <span class="text-[10.5px] text-slate-600" id="diff-sub"></span>
+      <div class="flex-1"></div>
+      <button id="diff-reject" class="btn text-rose-300 border-rose-500/25 bg-rose-500/8">Reject</button>
+      <button id="diff-accept" class="btn btn-primary">Accept</button>
+      <button id="diff-close" class="icon-btn">✕</button>
+    </div>
+    <div id="diff-editor" class="flex-1 min-h-0"></div>
+  </div>
+</div>
+
+<!-- ============ HISTORY PANEL ============ -->
+<div id="history-modal" class="hidden fixed inset-0 z-50 bg-black/65 backdrop-blur-[3px] items-center justify-center p-4">
+  <div class="w-full max-w-md rounded-2xl border overflow-hidden fade-in" style="border-color:rgba(255,255,255,.1);background:var(--panel);box-shadow:0 30px 80px -20px rgba(0,0,0,.9)">
+    <div class="h-12 flex items-center px-4 border-b" style="border-color:var(--border)">
+      <span class="font-semibold text-slate-200 text-[13.5px]">Conversation History</span>
+      <div class="flex-1"></div>
+      <button id="hist-close" class="icon-btn">✕</button>
+    </div>
+    <div id="hist-list" class="max-h-[60vh] overflow-y-auto scroll p-2"></div>
+  </div>
+</div>
+
+<div id="toasts" class="fixed top-14 right-4 z-[60] space-y-2 pointer-events-none"></div>
+
+<script>
+/* ============================================================
+   CHESE — browser-native AI coding agent
+   ============================================================ */
+
+/* ---------------- Helpers ---------------- */
+const $  = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+const esc = (s = '') => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+
+function debounce(fn, ms) {
+  let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+}
+
+function toast(msg, type = 'info', ms = 3400) {
+  const colors = {
+    info:    'border-white/10',
+    success: 'border-emerald-500/35',
+    error:   'border-rose-500/40',
+    warn:    'border-amber-500/35',
+  };
+  const icons = { info:'●', success:'✓', error:'✕', warn:'!' };
+  const iconColor = { info:'text-violet-400', success:'text-emerald-400', error:'text-rose-400', warn:'text-amber-400' };
+  const el = document.createElement('div');
+  el.className = 'toast pointer-events-auto ' + (colors[type] || colors.info);
+  el.innerHTML = `<span class="${iconColor[type] || ''} text-[13px] leading-none mt-[2px]">${icons[type] || '●'}</span>
+                  <span class="flex-1 break-words">${esc(msg)}</span>`;
+  $('#toasts').appendChild(el);
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 240); }, ms);
+}
+
+function langFromPath(p) {
+  const ext = (String(p).split('.').pop() || '').toLowerCase();
+  const map = {
+    js:'javascript', jsx:'javascript', mjs:'javascript', cjs:'javascript',
+    ts:'typescript', tsx:'typescript', mts:'typescript', cts:'typescript',
+    json:'json', jsonc:'json', html:'html', htm:'html', css:'css', scss:'scss',
+    less:'less', md:'markdown', markdown:'markdown', py:'python', rb:'ruby',
+    go:'go', rs:'rust', java:'java', kt:'kotlin', swift:'swift', c:'c', h:'c',
+    cpp:'cpp', cc:'cpp', hpp:'cpp', cs:'csharp', php:'php', sh:'shell',
+    bash:'shell', zsh:'shell', ps1:'powershell', yml:'yaml', yaml:'yaml',
+    xml:'xml', svg:'xml', sql:'sql', vue:'html', svelte:'html', toml:'ini',
+    ini:'ini', env:'ini', txt:'plaintext', lock:'plaintext', gitignore:'plaintext',
+    dockerfile:'dockerfile', graphql:'graphql', gql:'graphql', dart:'dart', lua:'lua',
+  };
+  return map[ext] || 'plaintext';
+}
+
+function fileColor(name) {
+  const ext = (String(name).split('.').pop() || '').toLowerCase();
+  const colors = {
+    js:'#f0d34a', jsx:'#61dafb', ts:'#4a9eff', tsx:'#61dafb', json:'#cbcb41',
+    html:'#e37933', css:'#56a3f5', scss:'#e06fa8', md:'#6b7d99', py:'#5a9fd4',
+    go:'#00add8', rs:'#e0865a', java:'#e76f00', rb:'#cc342d', php:'#8993be',
+    sh:'#7ec87e', yml:'#b48ead', yaml:'#b48ead', svg:'#ffb13b', sql:'#e38c5a',
+    vue:'#41b883', svelte:'#ff3e00', c:'#5a7fd4', cpp:'#5a7fd4', cs:'#8e6fd4',
+  };
+  return colors[ext] || '#5c6880';
+}
+
+/* ---------------- State ---------------- */
+const LS_SETTINGS   = 'chese.settings.v1';
+const LS_CHATS      = 'chese.chats.v1';
+const LS_VFS        = 'chese.vfs.v1';
+const LS_ARCHIVE_TS = 'chese.archive.lastSync';
+
+const CHEESE_ARCHIVE_NAME = 'chese.json';
+const CHEESE_ARCHIVE_VERSION = 1;
+
+const state = {
+  settings: {
+    baseUrl: 'https://openrouter.ai/api/v1',
+    apiKey: '',
+    model: '',
+    googleClientId: '',
+    temperature: 0.2,
+    autoApply: true,
+    autoArchive: true,
+    effort: 'auto',
+  },
+  models: [],
+  files: new Map(),      // path -> { content, handle?, driveId?, binary? }
+  tabs: [],
+  active: null,
+  chat: [],
+  chats: [],
+  chatId: uid(),
+  streaming: false,
+  abort: null,
+  connected: false,
+  archiveFileId: null,
+  archiveLastSync: 0,
+  archiveDirty: false,
+  archiveBusy: false,
+};
+
+function loadSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem(LS_SETTINGS) || '{}');
+    Object.assign(state.settings, s);
+  } catch (e) {}
+  state.archiveLastSync = parseInt(localStorage.getItem(LS_ARCHIVE_TS) || '0', 10) || 0;
+}
+function saveSettings() {
+  try { localStorage.setItem(LS_SETTINGS, JSON.stringify(state.settings)); } catch (e) {}
+  scheduleArchiveSave();
+}
+
+function loadChats() {
+  try { state.chats = JSON.parse(localStorage.getItem(LS_CHATS) || '[]'); } catch (e) { state.chats = []; }
+}
+function saveChats() {
+  const firstUser = state.chat.find(m => m.role === 'user');
+  const rec = {
+    id: state.chatId,
+    title: (firstUser?.content || 'New chat').slice(0, 70),
+    updated: Date.now(),
+    messages: state.chat.map(m => ({ id: m.id, role: m.role, content: m.content, clean: m.clean })),
+  };
+  const i = state.chats.findIndex(c => c.id === state.chatId);
+  if (i >= 0) state.chats[i] = rec; else state.chats.unshift(rec);
+  state.chats = state.chats.sort((a, b) => b.updated - a.updated).slice(0, 40);
+  try { localStorage.setItem(LS_CHATS, JSON.stringify(state.chats)); } catch (e) {}
+  scheduleArchiveSave();
+}
+
+/* ---------------- File system layer ---------------- */
+const Drive = {
+  token: null,
+
+  async connect() {
+    const cid = (state.settings.googleClientId || '').trim();
+    if (!cid) throw new Error('Set your Google OAuth Client ID in Settings first.');
+    await Drive._loadGIS();
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: cid,
+        scope: 'https://www.googleapis.com/auth/drive',
+        callback: (resp) => {
+          if (settled) return;
+          settled = true;
+          if (resp.error) return reject(new Error(resp.error_description || resp.error));
+          Drive.token = resp.access_token;
+          resolve(resp.access_token);
+        },
+        error_callback: (err) => {
+          if (settled) return;
+          settled = true;
+          reject(new Error(err?.message || 'Google sign-in was cancelled.'));
+        },
+      });
+      try { client.requestAccessToken({ prompt: '' }); }
+      catch (e) { reject(e); }
+    });
+  },
+
+  _loadGIS() {
+    return new Promise((res, rej) => {
+      if (window.google?.accounts?.oauth2) return res();
+      const s = document.createElement('script');
+      s.src = 'https://accounts.google.com/gsi/client';
+      s.async = true; s.defer = true;
+      s.onload = () => res();
+      s.onerror = () => rej(new Error('Failed to load Google Identity Services.'));
+      document.head.appendChild(s);
+    });
+  },
+
+  _auth() { return { Authorization: 'Bearer ' + Drive.token }; },
+
+  async list() {
+    const q = encodeURIComponent("trashed=false and mimeType!='application/vnd.google-apps.folder'");
+    const url = `https://www.googleapis.com/drive/v3/files?pageSize=1000&orderBy=name&fields=files(id,name,mimeType,modifiedTime,size)&q=${q}`;
+    const r = await fetch(url, { headers: Drive._auth() });
+    if (!r.ok) throw new Error('Drive list failed (' + r.status + ')');
+    const j = await r.json();
+    return (j.files || []).map(f => ({ id: f.id, name: f.name }));
+  },
+
+  async findByName(name) {
+    const q = encodeURIComponent(`trashed=false and name='${name.replace(/'/g, "\\'")}'`);
+    const url = `https://www.googleapis.com/drive/v3/files?pageSize=10&fields=files(id,name,modifiedTime)&q=${q}`;
+    const r = await fetch(url, { headers: Drive._auth() });
+    if (!r.ok) throw new Error('Drive search failed (' + r.status + ')');
+    const j = await r.json();
+    return (j.files || [])[0] || null;
+  },
+
+  async read(fileId) {
+    const r = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, { headers: Drive._auth() });
+    if (!r.ok) throw new Error('Drive read failed (' + r.status + ')');
+    return await r.text();
+  },
+
+  async create(name, content) {
+    const boundary = '-------chese' + Date.now();
+    const meta = JSON.stringify({ name, mimeType: 'application/json' });
+    const body =
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n` +
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${content}\r\n` +
+      `--${boundary}--`;
+    const r = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+      method: 'POST',
+      headers: { ...Drive._auth(), 'Content-Type': `multipart/related; boundary=${boundary}` },
+      body,
+    });
+    if (!r.ok) throw new Error('Drive create failed (' + r.status + ')');
+    const j = await r.json();
+    return j.id;
+  },
+
+  async update(fileId, content) {
+    const r = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+      method: 'PATCH',
+      headers: { ...Drive._auth(), 'Content-Type': 'application/json; charset=UTF-8' },
+      body: content,
+    });
+    if (!r.ok) throw new Error('Drive update failed (' + r.status + ')');
+  },
+
+  async remove(fileId) {
+    const r = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, { method: 'DELETE', headers: Drive._auth() });
+    if (!r.ok && r.status !== 404) throw new Error('Drive delete failed (' + r.status + ')');
+  },
+};
+
+const FS = {
+  kind: 'virtual',          // 'virtual' | 'dir' | 'drive'
+  rootHandle: null,
+
+  /* ---- virtual (localStorage) ---- */
+  persistVirtual() {
+    try {
+      const obj = {};
+      for (const [k, v] of state.files) if (typeof v.content === 'string') obj[k] = v.content;
+      localStorage.setItem(LS_VFS, JSON.stringify(obj));
+    } catch (e) {}
+  },
+  loadVirtual() {
+    try {
+      const obj = JSON.parse(localStorage.getItem(LS_VFS) || 'null');
+      if (obj) for (const [k, v] of Object.entries(obj)) state.files.set(k, { content: v });
+    } catch (e) {}
+  },
+
+  /* ---- directory ---- */
+  async openDirectory() {
+    if (!window.showDirectoryPicker) throw new Error('File System Access API not supported. Use Chrome or Edge.');
+    const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+    this.rootHandle = handle;
+    this.kind = 'dir';
+    state.files.clear();
+    await this._scan(handle, '');
+    updateStatusBar();
+  },
+
+  async _scan(dir, prefix) {
+    for await (const entry of dir.values()) {
+      const n = entry.name;
+      if (n.startsWith('.') || n === 'node_modules' || n === 'dist' || n === 'build' || n === '.git') continue;
+      const path = prefix ? `${prefix}/${n}` : n;
+      if (entry.kind === 'directory') {
+        await this._scan(entry, path);
+      } else {
+        try {
+          const file = await entry.getFile();
+          if (file.size > 2_000_000) {
+            state.files.set(path, { content: '/* File too large to preview (' + Math.round(file.size / 1024) + ' KB) */', handle: entry, binary: true });
+          } else {
+            state.files.set(path, { content: await file.text(), handle: entry });
+          }
+        } catch (e) { /* skip unreadable */ }
+      }
+    }
+  },
+
+  async _dirFor(path, create) {
+    const parts = path.split('/');
+    parts.pop();
+    let dir = this.rootHandle;
+    for (const p of parts) dir = await dir.getDirectoryHandle(p, { create: !!create });
+    return dir;
+  },
+
+  async _writeDir(path, content) {
+    let f = state.files.get(path);
+    if (!f || !f.handle) {
+      const dir = await this._dirFor(path, true);
+      const name = path.split('/').pop();
+      const handle = await dir.getFileHandle(name, { create: true });
+      f = Object.assign({}, f || {}, { handle });
+      state.files.set(path, f);
+    }
+    const w = await f.handle.createWritable();
+    await w.write(content);
+    await w.close();
+    f.content = content;
+    f.binary = false;
+  },
+
+  async _deleteDir(path) {
+    const dir = await this._dirFor(path, false);
+    await dir.removeEntry(path.split('/').pop());
+  },
+
+  /* ---- generic ---- */
+  async write(path, content) {
+    if (this.kind === 'dir' && this.rootHandle) {
+      await this._writeDir(path, content);
+    } else if (this.kind === 'drive' && Drive.token) {
+      let f = state.files.get(path);
+      if (!f) { f = {}; state.files.set(path, f); }
+      if (f.driveId) await Drive.update(f.driveId, content);
+      else f.driveId = await Drive.create(path, content);
+      f.content = content;
+    } else {
+      const f = state.files.get(path) || {};
+      f.content = content;
+      state.files.set(path, f);
+      this.persistVirtual();
+    }
+    scheduleArchiveSave();
+  },
+
+  async remove(path) {
+    const f = state.files.get(path);
+    if (this.kind === 'dir' && this.rootHandle) {
+      try { await this._deleteDir(path); } catch (e) { console.warn(e); }
+    } else if (this.kind === 'drive' && Drive.token && f?.driveId) {
+      try { await Drive.remove(f.driveId); } catch (e) { console.warn(e); }
+    }
+    state.files.delete(path);
+    if (this.kind === 'virtual') this.persistVirtual();
+    scheduleArchiveSave();
+  },
+
+  async readContent(path) {
+    const f = state.files.get(path);
+    if (!f) return null;
+    if (f.content == null && f.driveId) {
+      f.content = await Drive.read(f.driveId);
+    }
+    return f.content ?? '';
+  },
+};
+
+/* ============================================================
+   CHESE ARCHIVE  —  chese.json in Google Drive
+   Persists: settings (incl. API keys), model list, AI memory
+   (chat history + current conversation), and virtual FS files.
+   ============================================================ */
+
+let archiveSaveTimer = null;
+let archiveRetryTimer = null;
+
+function buildArchive() {
+  const archive = {
+    _chese: true,
+    _product: 'Chese',
+    version: CHEESE_ARCHIVE_VERSION,
+    updated: new Date().toISOString(),
+    settings: { ...state.settings },
+    models: state.models,
+    chats: state.chats,
+    chat: state.chat.map(m => ({
+      id: m.id,
+      role: m.role,
+      content: m.content,
+      clean: m.clean,
+    })),
+    chatId: state.chatId,
+  };
+  // Snapshot virtual FS only (folder/Drive modes already persist elsewhere)
+  if (FS.kind === 'virtual') {
+    archive.files = {};
+    for (const [k, v] of state.files) {
+      if (typeof v.content === 'string') archive.files[k] = v.content;
+    }
+  }
+  return archive;
+}
+
+function setArchivePill(status, text) {
+  const pill = $('#chese-sync-pill');
+  const txt = $('#chese-sync-text');
+  if (!pill || !txt) return;
+  pill.classList.remove('ok', 'err', 'busy');
+  if (status) pill.classList.add(status);
+  txt.textContent = text;
+  // status bar
+  const sb = $('#status-archive');
+  if (sb) {
+    if (status === 'ok') { sb.textContent = 'archive: ' + text; sb.style.color = '#6ee7b7'; }
+    else if (status === 'err') { sb.textContent = 'archive: ' + text; sb.style.color = '#fda4af'; }
+    else if (status === 'busy') { sb.textContent = 'archive: ' + text; sb.style.color = '#c4b5fd'; }
+    else { sb.textContent = 'archive: ' + text; sb.style.color = '#6b7690'; }
+  }
+}
+
+async function saveCheseArchive({ silent = true, force = false } = {}) {
+  if (!Drive.token) {
+    if (!silent) toast('Connect Google Drive first to archive chese.json', 'warn');
+    return false;
+  }
+  if (state.archiveBusy) return false;
+  if (!force && !state.archiveDirty) {
+    if (!silent) toast('Nothing new to archive', 'info', 1800);
+    return false;
+  }
+
+  state.archiveBusy = true;
+  setArchivePill('busy', 'saving…');
+
+  try {
+    const archive = buildArchive();
+    const json = JSON.stringify(archive, null, 2);
+
+    let fileId = state.archiveFileId;
+    if (!fileId) {
+      const existing = await Drive.findByName(CHEESE_ARCHIVE_NAME);
+      if (existing) fileId = existing.id;
+    }
+
+    if (fileId) {
+      await Drive.update(fileId, json);
+    } else {
+      fileId = await Drive.create(CHEESE_ARCHIVE_NAME, json);
+    }
+
+    state.archiveFileId = fileId;
+    state.archiveLastSync = Date.now();
+    state.archiveDirty = false;
+    try { localStorage.setItem(LS_ARCHIVE_TS, String(state.archiveLastSync)); } catch (e) {}
+
+    setArchivePill('ok', 'synced ' + new Date().toLocaleTimeString());
+    if (!silent) toast('Chese archive saved to Drive', 'success');
+    return true;
+  } catch (e) {
+    setArchivePill('err', 'save failed');
+    if (!silent) toast('Chese archive save failed: ' + e.message, 'error', 6000);
+    // retry once in 20s if auto
+    if (silent) {
+      clearTimeout(archiveRetryTimer);
+      archiveRetryTimer = setTimeout(() => {
+        if (state.archiveDirty && Drive.token) saveCheseArchive({ silent: true });
+      }, 20000);
+    }
+    return false;
+  } finally {
+    state.archiveBusy = false;
+  }
+}
+
+function scheduleArchiveSave(delay = 2200) {
+  if (!state.settings.autoArchive) return;
+  if (!Drive.token) return;
+  state.archiveDirty = true;
+  clearTimeout(archiveSaveTimer);
+  archiveSaveTimer = setTimeout(() => {
+    if (state.archiveDirty && !state.streaming) saveCheseArchive({ silent: true });
+  }, delay);
+}
+
+async function loadCheseArchive({ silent = false } = {}) {
+  if (!Drive.token) {
+    toast('Connect Google Drive first to load chese.json', 'warn');
+    return false;
+  }
+  setArchivePill('busy', 'loading…');
+  try {
+    const existing = await Drive.findByName(CHEESE_ARCHIVE_NAME);
+    if (!existing) {
+      setArchivePill('', 'not found');
+      toast('No chese.json found in your Google Drive', 'warn', 4500);
+      return false;
+    }
+    const raw = await Drive.read(existing.id);
+    const archive = JSON.parse(raw);
+    if (!archive || !archive._chese) {
+      setArchivePill('err', 'bad format');
+      toast('chese.json is not a valid Chese archive', 'error', 5000);
+      return false;
+    }
+
+    state.archiveFileId = existing.id;
+
+    // 1. Settings (includes API keys + model + google client id)
+    if (archive.settings && typeof archive.settings === 'object') {
+      Object.assign(state.settings, archive.settings);
+      state.settings.autoArchive = true; // keep auto-save on after load
+      try { localStorage.setItem(LS_SETTINGS, JSON.stringify(state.settings)); } catch (e) {}
+    }
+
+    // 2. Models
+    if (Array.isArray(archive.models)) state.models = archive.models;
+
+    // 3. AI memory — conversation history list
+    if (Array.isArray(archive.chats)) {
+      state.chats = archive.chats;
+      try { localStorage.setItem(LS_CHATS, JSON.stringify(state.chats)); } catch (e) {}
+    }
+
+    // 4. Current conversation
+    if (Array.isArray(archive.chat) && archive.chat.length) {
+      state.chat = archive.chat.map(m => ({
+        id: m.id || uid(),
+        role: m.role,
+        content: m.content || '',
+        clean: m.clean,
+        ops: [],
+        streaming: false,
+      }));
+      state.chatId = archive.chatId || uid();
+    }
+
+    // 5. Virtual FS snapshot (only if we're in virtual mode)
+    if (archive.files && typeof archive.files === 'object' && FS.kind === 'virtual') {
+      for (const [path, content] of Object.entries(archive.files)) {
+        state.files.set(path, { content });
+      }
+      FS.persistVirtual();
+    }
+
+    // Refresh all UI surfaces
+    syncSettingsUI();
+    syncModelSelect();
+    applyEffortUI();
+    $('#autoapply').checked = !!state.settings.autoApply;
+    renderChat();
+    renderTree();
+    renderTabs();
+    updateStatusBar();
+    updateCtxHint();
+    updateSendButton();
+
+    state.connected = !!state.settings.apiKey;
+    state.archiveDirty = false;
+    state.archiveLastSync = existing.modifiedTime ? new Date(existing.modifiedTime).getTime() : Date.now();
+    try { localStorage.setItem(LS_ARCHIVE_TS, String(state.archiveLastSync)); } catch (e) {}
+
+    const when = archive.updated ? new Date(archive.updated).toLocaleString() : 'unknown';
+    setArchivePill('ok', 'loaded');
+    if (!silent) toast('Chese loaded — archived ' + when, 'success', 5000);
+    return true;
+  } catch (e) {
+    setArchivePill('err', 'load failed');
+    if (!silent) toast('Chese load failed: ' + e.message, 'error', 6000);
+    return false;
+  }
+}
+
+function syncSettingsUI() {
+  $('#set-base').value = state.settings.baseUrl || '';
+  $('#set-key').value = state.settings.apiKey || '';
+  $('#set-model').value = state.settings.model || '';
+  $('#set-temp').value = state.settings.temperature ?? 0.2;
+  $('#set-gcid').value = state.settings.googleClientId || '';
+  $('#set-autoapply').value = String(!!state.settings.autoApply);
+  const as = $('#set-autosave');
+  if (as) as.checked = !!state.settings.autoArchive;
+}
+
+/* ---------------- File tree ---------------- */
+const collapsed = new Set();
+
+function buildTree(paths) {
+  const root = { name: '', path: '', isFile: false, children: new Map() };
+  for (const p of paths) {
+    const parts = p.split('/');
+    let node = root;
+    parts.forEach((part, i) => {
+      const isFile = i === parts.length - 1;
+      if (!node.children.has(part)) {
+        node.children.set(part, {
+          name: part,
+          path: parts.slice(0, i + 1).join('/'),
+          isFile,
+          children: new Map(),
+        });
+      }
+      node = node.children.get(part);
+    });
+  }
+  return root;
+}
+
+function renderTreeNode(node, depth) {
+  const entries = [...node.children.values()].sort((a, b) =>
+    (a.isFile === b.isFile) ? a.name.localeCompare(b.name) : (a.isFile ? 1 : -1)
+  );
+  let html = '';
+  for (const e of entries) {
+    const pad = 8 + depth * 12;
+    if (e.isFile) {
+      const active = state.active === e.path;
+      html += `<div class="tree-row ${active ? 'active' : ''}" data-path="${esc(e.path)}" style="padding-left:${pad}px" title="${esc(e.path)}">
+        <span class="dot" style="background:${fileColor(e.name)}"></span>
+        <span class="truncate">${esc(e.name)}</span>
+      </div>`;
+    } else {
+      const open = !collapsed.has(e.path);
+      html += `<div class="tree-row" data-dir="${esc(e.path)}" style="padding-left:${pad}px">
+        <svg class="chev ${open ? 'open' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+        <span class="truncate">${esc(e.name)}</span>
+      </div>`;
+      if (open) html += renderTreeNode(e, depth + 1);
+    }
+  }
+  return html;
+}
+
+function renderTree() {
+  const el = $('#filetree');
+  const paths = [...state.files.keys()].sort();
+  if (!paths.length) {
+    el.innerHTML = `<div class="px-4 py-8 text-center text-[11.5px] text-slate-600 leading-relaxed">
+      No files yet.<br><span class="text-slate-700">Open a folder, connect Drive,<br>or ask the agent to create one.</span></div>`;
+    return;
+  }
+  el.innerHTML = renderTreeNode(buildTree(paths), 0);
+}
+
+$('#filetree').addEventListener('click', (e) => {
+  const dir = e.target.closest('[data-dir]');
+  if (dir) {
+    const p = dir.dataset.dir;
+    if (collapsed.has(p)) collapsed.delete(p); else collapsed.add(p);
+    renderTree();
+    return;
+  }
+  const file = e.target.closest('[data-path]');
+  if (file) openFile(file.dataset.path);
+});
+
+/* ---------------- Monaco ---------------- */
+let editor = null;
+let monacoReady = false;
+let suppressChange = false;
+const editorModels = new Map();
+
+require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
+
+require(['vs/editor/editor.main'], function () {
+  monaco.editor.defineTheme('chese-dark', {
+    base: 'vs-dark',
+    inherit: true,
+    rules: [
+      { token: 'comment', foreground: '5a6480', fontStyle: 'italic' },
+      { token: 'keyword', foreground: 'a68bff' },
+      { token: 'string', foreground: '8fd694' },
+      { token: 'number', foreground: 'f0a868' },
+      { token: 'type', foreground: '5fb8e8' },
+      { token: 'function', foreground: '7fb8ff' },
+      { token: 'variable', foreground: 'c8d3e6' },
+    ],
+    colors: {
+      'editor.background': '#0b0d12',
+      'editor.foreground': '#c3cede',
+      'editorLineNumber.foreground': '#2f3648',
+      'editorLineNumber.activeForeground': '#6b7a99',
+      'editor.selectionBackground': '#2c3550',
+      'editor.lineHighlightBackground': '#12151d',
+      'editorCursor.foreground': '#7c5cff',
+      'editorIndentGuide.background1': '#1a1f2b',
+      'editorIndentGuide.activeBackground1': '#2a3145',
+      'editorWidget.background': '#12151d',
+      'editorWidget.border': '#232a3a',
+      'scrollbarSlider.background': '#232a3a80',
+      'scrollbarSlider.hoverBackground': '#2f374d',
+      'minimap.background': '#0b0d12',
+      'editorGutter.background': '#0b0d12',
+    },
+  });
+
+  /* ---- Light theme ---- */
+  monaco.editor.defineTheme('chese-light', {
+    base: 'vs',
+    inherit: true,
+    rules: [
+      { token: 'comment',  foreground: '8b9cb6', fontStyle: 'italic' },
+      { token: 'keyword',  foreground: '6d28d9' },
+      { token: 'string',   foreground: '166534' },
+      { token: 'number',   foreground: 'b45309' },
+      { token: 'type',     foreground: '1d4ed8' },
+      { token: 'function', foreground: '1e40af' },
+      { token: 'variable', foreground: '374151' },
+    ],
+    colors: {
+      'editor.background':                 '#f0f2f5',
+      'editor.foreground':                 '#1f2937',
+      'editorLineNumber.foreground':       '#9ca3af',
+      'editorLineNumber.activeForeground': '#6b7280',
+      'editor.selectionBackground':        '#c7d2fe',
+      'editor.lineHighlightBackground':    '#e5e7eb',
+      'editorCursor.foreground':           '#7c5cff',
+      'editorIndentGuide.background1':     '#e5e7eb',
+      'editorIndentGuide.activeBackground1': '#d1d5db',
+      'editorWidget.background':           '#ffffff',
+      'editorWidget.border':               '#e5e7eb',
+      'scrollbarSlider.background':        '#d1d5db80',
+      'scrollbarSlider.hoverBackground':   '#9ca3af',
+      'minimap.background':                '#f0f2f5',
+      'editorGutter.background':           '#f0f2f5',
+    },
+  });
+
+  editor = monaco.editor.create($('#editor'), {
+    theme: 'chese-dark',
+    automaticLayout: true,
+    fontSize: 13,
+    lineHeight: 20,
+    fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+    fontLigatures: true,
+    minimap: { enabled: true, maxColumn: 80, renderCharacters: false, scale: 1 },
+    scrollBeyondLastLine: false,
+    smoothScrolling: true,
+    cursorBlinking: 'smooth',
+    cursorSmoothCaretAnimation: 'on',
+    renderLineHighlight: 'all',
+    padding: { top: 10, bottom: 10 },
+    tabSize: 2,
+    wordWrap: 'off',
+    bracketPairColorization: { enabled: true },
+    guides: { bracketPairs: true, indentation: true },
+    scrollbar: { verticalScrollbarSize: 10, horizontalScrollbarSize: 10, useShadows: false },
+    overviewRulerBorder: false,
+    renderWhitespace: 'selection',
+  });
+
+  editor.onDidChangeModelContent(() => {
+    if (suppressChange) return;
+    const path = state.active;
+    if (!path) return;
+    const f = state.files.get(path) || {};
+    f.content = editor.getValue();
+    state.files.set(path, f);
+    setSaveStatus('unsaved');
+    scheduleSave(path);
+  });
+
+  editor.onDidChangeCursorPosition((e) => {
+    $('#status-cursor').textContent = `Ln ${e.position.lineNumber}, Col ${e.position.column}`;
+  });
+
+  // Apply saved/current theme
+  if (!document.documentElement.classList.contains('dark')) {
+    monaco.editor.setTheme('chese-light');
+  }
+  monacoReady = true;
+  $('#editor-loading').classList.add('hidden');
+  if (state.active) showEditorFor(state.active);
+  else showWelcome();
+});
+
+const saveTimers = new Map();
+function scheduleSave(path) {
+  clearTimeout(saveTimers.get(path));
+  saveTimers.set(path, setTimeout(async () => {
+    try {
+      const f = state.files.get(path);
+      if (!f || typeof f.content !== 'string') return;
+      await FS.write(path, f.content);
+      setSaveStatus('saved');
+    } catch (e) {
+      setSaveStatus('error');
+      toast('Save failed: ' + e.message, 'error');
+    }
+  }, 900));
+}
+
+function setSaveStatus(s) {
+  const el = $('#status-save');
+  if (!el) return;
+  if (s === 'saved') { el.textContent = 'saved'; el.style.color = '#5a6480'; }
+  else if (s === 'unsaved') { el.textContent = 'editing…'; el.style.color = '#a68bff'; }
+  else if (s === 'saving') { el.textContent = 'saving…'; el.style.color = '#f0a868'; }
+  else { el.textContent = 'save error'; el.style.color = '#f06060'; }
+}
+
+function getModelFor(path) {
+  if (editorModels.has(path)) return editorModels.get(path);
+  const f = state.files.get(path);
+  const uri = monaco.Uri.parse('file:///' + path.split('/').map(encodeURIComponent).join('/'));
+  const m = monaco.editor.createModel(f?.content ?? '', langFromPath(path), uri);
+  editorModels.set(path, m);
+  return m;
+}
+
+function showWelcome() {
+  $('#welcome').classList.remove('hidden');
+  $('#editor').style.opacity = '0';
+}
+function hideWelcome() {
+  $('#welcome').classList.add('hidden');
+  $('#editor').style.opacity = '1';
+}
+
+function showEditorFor(path) {
+  if (!monacoReady) return;
+  const m = getModelFor(path);
+  if (editor.getModel() !== m) {
+    suppressChange = true;
+    editor.setModel(m);
+    suppressChange = false;
+  }
+  hideWelcome();
+  updateStatusBar();
+}
+
+async function openFile(path) {
+  if (!state.files.has(path)) return;
+  try {
+    const f = state.files.get(path);
+    if (f.content == null) {
+      f.content = await FS.readContent(path);
+      if (monacoReady && editorModels.has(path)) {
+        suppressChange = true;
+        editorModels.get(path).setValue(f.content ?? '');
+        suppressChange = false;
+      }
+    }
+  } catch (e) {
+    toast('Could not open file: ' + e.message, 'error');
+    return;
+  }
+  if (!state.tabs.includes(path)) state.tabs.push(path);
+  state.active = path;
+  renderTabs();
+  renderTree();
+  showEditorFor(path);
+  updateStatusBar();
+}
+
+function closeTab(path) {
+  state.tabs = state.tabs.filter(t => t !== path);
+  if (state.active === path) {
+    state.active = state.tabs[state.tabs.length - 1] || null;
+    if (state.active) showEditorFor(state.active);
+    else { editor && editor.setModel(null); showWelcome(); }
+  }
+  renderTabs();
+  updateStatusBar();
+}
+
+function renderTabs() {
+  const el = $('#tabs');
+  if (!state.tabs.length) { el.innerHTML = ''; return; }
+  el.innerHTML = state.tabs.map(p => `
+    <div class="tab ${state.active === p ? 'active' : ''}" data-tab="${esc(p)}" title="${esc(p)}">
+      <span class="dot" style="background:${fileColor(p)}"></span>
+      <span class="truncate max-w-[150px]">${esc(p.split('/').pop())}</span>
+      <button class="tab-x" data-close="${esc(p)}">✕</button>
+    </div>`).join('');
+}
+
+$('#tabs').addEventListener('click', (e) => {
+  const close = e.target.closest('[data-close]');
+  if (close) { e.stopPropagation(); closeTab(close.dataset.close); return; }
+  const tab = e.target.closest('[data-tab]');
+  if (tab) openFile(tab.dataset.tab);
+});
+
+/* ---------------- Status bar ---------------- */
+function updateStatusBar() {
+  const fsLabel = FS.kind === 'dir' ? 'local folder' : FS.kind === 'drive' ? 'google drive' : 'virtual fs';
+  $('#status-fs').textContent = fsLabel;
+  $('#status-file').textContent = state.active || '—';
+  $('#status-model').textContent = state.settings.model || 'no model';
+  const dot = $('#conn-dot'), txt = $('#conn-text');
+  if (state.streaming) { dot.style.background = '#f0a868'; txt.textContent = 'Generating…'; }
+  else if (state.connected) { dot.style.background = '#34d399'; txt.textContent = 'Ready'; }
+  else { dot.style.background = '#4b5566'; txt.textContent = state.settings.apiKey ? 'Idle' : 'Not configured'; }
+
+  // archive pill
+  if (Drive.token) {
+    if (state.archiveBusy) setArchivePill('busy', 'syncing…');
+    else if (state.archiveDirty) setArchivePill('busy', 'pending…');
+    else if (state.archiveLastSync) setArchivePill('ok', 'synced ' + new Date(state.archiveLastSync).toLocaleTimeString());
+    else setArchivePill('', 'ready');
+  } else {
+    setArchivePill('', 'not linked');
+  }
+}
+
+/* ---------------- Markdown renderer ---------------- */
+function inlineMd(s) {
+  return esc(s)
+    .replace(/`([^`]+)`/g, '<code class="ic">$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[\s(])\*([^*\n]+)\*/g, '$1<em>$2</em>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="text-violet-400 hover:underline">$1</a>');
+}
+
+function md(src) {
+  if (!src) return '';
+  const blocks = [];
+  src = src.replace(/```([^\n`]*)\n([\s\S]*?)```/g, (m, lang, code) => {
+    const i = blocks.push(
+      `<div class="cb"><div class="cb-h">${esc((lang || 'code').trim() || 'code')}</div><pre><code>${esc(code.replace(/\n$/, ''))}</code></pre></div>`
+    ) - 1;
+    return `\n@@B${i}@@\n`;
+  });
+
+  const lines = src.split('\n');
+  const out = [];
+  let inList = false;
+  for (const raw of lines) {
+    const line = raw;
+    const bm = line.match(/^@@B(\d+)@@$/);
+    if (bm) { if (inList) { out.push('</ul>'); inList = false; } out.push(blocks[+bm[1]]); continue; }
+
+    const li = line.match(/^\s*[-*+]\s+(.*)$/);
+    if (li) {
+      if (!inList) { out.push('<ul>'); inList = true; }
+      out.push(`<li>${inlineMd(li[1])}</li>`);
+      continue;
+    }
+    if (inList) { out.push('</ul>'); inList = false; }
+
+    const h = line.match(/^(#{1,4})\s+(.*)$/);
+    if (h) { out.push(`<div class="md-h">${inlineMd(h[2])}</div>`); continue; }
+    if (!line.trim()) { out.push('<div style="height:7px"></div>'); continue; }
+    out.push(`<p>${inlineMd(line)}</p>`);
+  }
+  if (inList) out.push('</ul>');
+  return out.join('');
+}
+
+/* ---------------- Op parsing ---------------- */
+function parseBlocks(text) {
+  const ops = [];
+  const spans = [];
+  const re = /<chese-(write|delete)\s+path\s*=\s*"([^"]*)"\s*(\/?)>/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const [full, kind, path, selfClose] = m;
+    const start = m.index;
+    if (kind === 'write' && !selfClose) {
+      const closeTag = '</chese-write>';
+      const closeIdx = text.indexOf(closeTag, start + full.length);
+      if (closeIdx === -1) {
+        ops.push({ kind, path, content: text.slice(start + full.length), complete: false, start });
+        spans.push([start, text.length]);
+        break;
+      }
+      ops.push({ kind, path, content: text.slice(start + full.length, closeIdx), complete: true, start });
+      spans.push([start, closeIdx + closeTag.length]);
+      re.lastIndex = closeIdx + closeTag.length;
+    } else {
+      ops.push({ kind, path, content: '', complete: true, start });
+      spans.push([start, start + full.length]);
+    }
+  }
+
+  // fallback: ```file:path  fenced blocks
+  const consumed = new Set();
+  spans.forEach(([a, b]) => { for (let i = a; i < b; i++) consumed.add(i); });
+  const fenceRe = /```(?:file:|file=)\s*([^\s`\n]+)\s*\n([\s\S]*?)```/g;
+  let fm;
+  while ((fm = fenceRe.exec(text)) !== null) {
+    if (consumed.has(fm.index)) continue;
+    ops.push({ kind: 'write', path: fm[1].trim(), content: fm[2], complete: true, start: fm.index });
+    spans.push([fm.index, fm.index + fm[0].length]);
+  }
+
+  spans.sort((a, b) => a[0] - b[0]);
+  let clean = '', cursor = 0;
+  for (const [a, b] of spans) {
+    if (a < cursor) continue;
+    clean += text.slice(cursor, a);
+    cursor = b;
+  }
+  clean += text.slice(cursor);
+
+  ops.sort((a, b) => a.start - b.start);
+  return { clean: clean.trim(), ops };
+}
+
+/* ---------------- Chat rendering ---------------- */
+function opCard(op) {
+  const isNew = op.prev == null && op.kind !== 'delete';
+  const icon = op.kind === 'delete' ? '🗑️' : (isNew ? '📄' : '✏️');
+  const verb = op.kind === 'delete' ? 'Deleting' : (isNew ? 'Creating' : 'Editing');
+  const badges = {
+    pending:  'text-amber-300 bg-amber-500/10 border-amber-500/25',
+    applied:  'text-emerald-300 bg-emerald-500/10 border-emerald-500/25',
+    rejected: 'text-slate-400 bg-white/5 border-white/10',
+    error:    'text-rose-300 bg-rose-500/10 border-rose-500/25',
+    reverted: 'text-sky-300 bg-sky-500/10 border-sky-500/25',
+  };
+  const lines = op.kind === 'delete' ? 0 : (op.content.match(/\n/g) || []).length + 1;
+  let actions = '';
+  if (op.status === 'pending') actions = `<button class="opbtn" data-act="apply">Apply</button><button class="opbtn" data-act="reject">Reject</button>`;
+  else if (op.status === 'applied') actions = `<button class="opbtn" data-act="revert">Revert</button>`;
+  else if (op.status === 'rejected' || op.status === 'reverted') actions = `<button class="opbtn" data-act="apply">Apply</button>`;
+  actions += `<button class="opbtn" data-act="diff">View diff</button>`;
+
+  return `<div class="op-card" data-op="${op.id}">
+    <div class="flex items-center gap-2 min-w-0">
+      <span class="text-[12px]">${icon}</span>
+      <span class="text-[12px] text-slate-300 truncate">${verb} <code class="ic">${esc(op.path)}</code></span>
+      <span class="text-[9.5px] px-1.5 py-[2px] rounded border whitespace-nowrap ${badges[op.status] || ''}">${op.status}</span>
+      <span class="text-[10px] text-slate-600 ml-auto shrink-0">${op.kind === 'delete' ? '' : lines + ' lines'}</span>
+    </div>
+    <div class="flex gap-1.5 mt-2">${actions}</div>
+    ${op.error ? `<div class="text-[10.5px] text-rose-400 mt-1.5">${esc(op.error)}</div>` : ''}
+  </div>`;
+}
+
+function renderMessage(m) {
+  if (m.role === 'user') {
+    return `<div class="flex justify-end mb-3.5" data-mid="${m.id}">
+      <div class="max-w-[88%] rounded-2xl rounded-br-md px-3.5 py-2.5 text-[13px] leading-relaxed text-white whitespace-pre-wrap break-words"
+           style="background:linear-gradient(180deg,#7c5cff,#6a48f5);box-shadow:0 3px 14px -6px rgba(124,92,255,.8)">${esc(m.content)}</div>
+    </div>`;
+  }
+  const bodyText = (m.clean != null ? m.clean : (m.content || ''));
+  const body = md(bodyText);
+  const liveChip = (m.streaming && m.live)
+    ? `<div class="live-chip">✏️ Writing <code class="ic">${esc(m.live.path)}</code><span class="cursor-blink">▍</span></div>`
+    : '';
+  const emptyCursor = (m.streaming && !body && !liveChip) ? '<span class="cursor-blink">▍</span>' : '';
+  const ops = (m.ops || []).map(opCard).join('');
+  return `<div class="mb-4 fade-in" data-mid="${m.id}">
+    <div class="flex items-center gap-2 mb-1.5">
+      <div class="w-[18px] h-[18px] rounded-md grid place-items-center text-[9px] font-black text-white"
+           style="background:linear-gradient(135deg,#8b6dff,#4f7dff)">C</div>
+      <span class="text-[10.5px] text-slate-500 font-medium tracking-wide">Chese</span>
+      ${m.streaming ? '<span class="text-[10px] text-violet-400/70">thinking…</span>' : ''}
+    </div>
+    <div class="msg-body text-[12.8px] leading-[1.68] text-slate-300">${body}${emptyCursor}</div>
+    ${liveChip}
+    ${ops}
+  </div>`;
+}
+
+function renderChat() {
+  const box = $('#messages');
+  if (!state.chat.length) {
+    box.innerHTML = `<div class="h-full flex flex-col items-center justify-center text-center px-6">
+      <div class="w-11 h-11 rounded-xl grid place-items-center text-white text-base font-black mb-3"
+           style="background:linear-gradient(135deg,#8b6dff,#4f7dff);box-shadow:0 6px 24px -8px rgba(124,92,255,.9)">C</div>
+      <div class="text-slate-300 text-[13px] font-medium mb-1">Ask Chese to build something</div>
+      <div class="text-slate-600 text-[11.5px] leading-relaxed max-w-[260px]">
+        The agent can read your project, create files, and rewrite code in real time.
+      </div>
+      <div class="mt-4 space-y-1.5 w-full max-w-[280px]">
+        ${['Create a responsive landing page in index.html', 'Add a dark mode toggle to the app', 'Refactor this file and add JSDoc comments']
+          .map(t => `<button class="suggest w-full text-left text-[11.5px] text-slate-400 border rounded-lg px-3 py-2 hover:text-slate-200 hover:border-violet-500/40 transition"
+             style="border-color:rgba(255,255,255,.07);background:rgba(255,255,255,.02)" data-s="${esc(t)}">${esc(t)}</button>`).join('')}
+      </div>
+    </div>`;
+    return;
+  }
+  box.innerHTML = state.chat.map(renderMessage).join('');
+  scrollChat();
+}
+
+function scrollChat() {
+  const box = $('#messages');
+  box.scrollTop = box.scrollHeight;
+}
+
+$('#messages').addEventListener('click', async (e) => {
+  const sug = e.target.closest('.suggest');
+  if (sug) { $('#chat-input').value = sug.dataset.s; autoGrow($('#chat-input')); $('#chat-input').focus(); return; }
+
+  const btn = e.target.closest('.opbtn');
+  if (!btn) return;
+  const card = btn.closest('.op-card');
+  const op = findOp(card?.dataset.op);
+  if (!op) return;
+  const act = btn.dataset.act;
+  if (act === 'apply') await applyOp(op);
+  else if (act === 'reject') { op.status = 'rejected'; renderChat(); }
+  else if (act === 'revert') await revertOp(op);
+  else if (act === 'diff') openDiff(op);
+});
+
+function findOp(id) {
+  for (const m of state.chat) for (const o of (m.ops || [])) if (o.id === id) return o;
+  return null;
+}
+
+/* ---------------- Op application ---------------- */
+async function applyOp(op, rerender = true) {
+  try {
+    if (op.kind === 'delete') {
+      op.prev = state.files.get(op.path)?.content ?? null;
+      await FS.remove(op.path);
+      closeTab(op.path);
+      renderTree();
+      op.status = 'applied';
+      toast('Deleted ' + op.path, 'success');
+    } else {
+      const existing = state.files.get(op.path);
+      op.prev = existing?.content ?? null;
+      await FS.write(op.path, op.content);
+      const f = state.files.get(op.path) || {};
+      f.content = op.content;
+      state.files.set(op.path, f);
+
+      if (monacoReady) {
+        if (editorModels.has(op.path)) {
+          const m = editorModels.get(op.path);
+          if (m.getValue() !== op.content) {
+            suppressChange = true;
+            m.setValue(op.content);
+            suppressChange = false;
+          }
+        }
+      }
+      renderTree();
+      renderTabs();
+      op.status = 'applied';
+      toast((op.prev == null ? 'Created ' : 'Updated ') + op.path, 'success');
+    }
+    setSaveStatus('saved');
+  } catch (e) {
+    op.status = 'error';
+    op.error = e.message;
+    toast('Failed: ' + e.message, 'error');
+  }
+  if (rerender) renderChat();
+  scheduleArchiveSave();
+}
+
+async function revertOp(op) {
+  try {
+    if (op.prev == null) {
+      await FS.remove(op.path);
+      closeTab(op.path);
+    } else {
+      await FS.write(op.path, op.prev);
+      const f = state.files.get(op.path) || {};
+      f.content = op.prev;
+      state.files.set(op.path, f);
+      if (monacoReady && editorModels.has(op.path)) {
+        suppressChange = true;
+        editorModels.get(op.path).setValue(op.prev);
+        suppressChange = false;
+      }
+    }
+    op.status = 'reverted';
+    renderTree();
+    renderTabs();
+    renderChat();
+    toast('Reverted ' + op.path, 'info');
+  } catch (e) {
+    toast('Revert failed: ' + e.message, 'error');
+  }
+}
+
+/* ---------------- Diff viewer ---------------- */
+let diffEditor = null;
+let diffOp = null;
+
+function openDiff(op) {
+  if (!monacoReady) { toast('Editor not ready yet', 'warn'); return; }
+  diffOp = op;
+  const modal = $('#diff-modal');
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+
+  const original = op.kind === 'delete' ? (op.prev ?? '') : (op.prev ?? '');
+  const modified = op.kind === 'delete' ? '' : op.content;
+
+  $('#diff-title').textContent = op.path;
+  $('#diff-sub').textContent = op.kind === 'delete'
+    ? 'file deletion'
+    : (op.prev == null ? 'new file' : 'modification');
+
+  requestAnimationFrame(() => {
+    if (diffEditor) { diffEditor.dispose(); diffEditor = null; }
+    $('#diff-editor').innerHTML = '';
+    diffEditor = monaco.editor.createDiffEditor($('#diff-editor'), {
+      theme: document.documentElement.classList.contains('dark') ? 'chese-dark' : 'chese-light',
+      automaticLayout: true,
+      readOnly: true,
+      renderSideBySide: true,
+      fontSize: 12.5,
+      fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+      scrollBeyondLastLine: false,
+      minimap: { enabled: false },
+      renderOverviewRuler: false,
+      padding: { top: 8, bottom: 8 },
+    });
+    const lang = langFromPath(op.path);
+    const orig = monaco.editor.createModel(original, lang);
+    const mod = monaco.editor.createModel(modified, lang);
+    diffEditor.setModel({ original: orig, modified: mod });
+  });
+}
+
+function closeDiff() {
+  const modal = $('#diff-modal');
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+  if (diffEditor) {
+    const m = diffEditor.getModel();
+    if (m) { m.original?.dispose(); m.modified?.dispose(); }
+    diffEditor.dispose();
+    diffEditor = null;
+  }
+  diffOp = null;
+}
+
+$('#diff-close').addEventListener('click', closeDiff);
+$('#diff-reject').addEventListener('click', () => {
+  if (diffOp) { diffOp.status = 'rejected'; renderChat(); }
+  closeDiff();
+});
+$('#diff-accept').addEventListener('click', async () => {
+  const op = diffOp;
+  closeDiff();
+  if (op && op.status !== 'applied') await applyOp(op);
+});
+
+/* ---------------- AI API ---------------- */
+function apiUrl(path) {
+  let base = (state.settings.baseUrl || '').trim().replace(/\/+$/, '');
+  if (!base) base = 'https://openrouter.ai/api/v1';
+  return base + path;
+}
+
+function authHeaders() {
+  const h = { 'Content-Type': 'application/json' };
+  if (state.settings.apiKey) h['Authorization'] = 'Bearer ' + state.settings.apiKey;
+  if (/openrouter\.ai/i.test(state.settings.baseUrl)) {
+    h['HTTP-Referer'] = location.origin || 'https://chese.local';
+    h['X-Title'] = 'Chese';
+  }
+  return h;
+}
+
+async function fetchModelsFrom(base, key) {
+  const clean = base.trim().replace(/\/+$/, '');
+  const candidates = [clean + '/models'];
+  if (!/\/v\d+$/.test(clean)) candidates.push(clean + '/v1/models');
+
+  let lastErr = null;
+  for (const url of candidates) {
+    try {
+      const headers = {};
+      if (key) headers['Authorization'] = 'Bearer ' + key;
+      const r = await fetch(url, { headers });
+      if (!r.ok) { lastErr = new Error(`HTTP ${r.status}`); continue; }
+      const j = await r.json();
+      let list = [];
+      if (Array.isArray(j.data)) list = j.data.map(m => ({ id: m.id || m.name, name: m.name || m.id }));
+      else if (Array.isArray(j.models)) list = j.models.map(m => ({ id: m.id || m.name, name: m.name || m.id }));
+      else if (Array.isArray(j)) list = j.map(m => ({ id: m.id || m.name, name: m.name || m.id }));
+      list = list.filter(x => x.id);
+      if (list.length) return list;
+      lastErr = new Error('No models returned');
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr || new Error('Could not fetch models');
+}
+
+/* ---------------- System prompt / messages ---------------- */
+function buildSystemPrompt() {
+  const paths = [...state.files.keys()].sort();
+  const active = state.active;
+
+  let s = `You are Chese, an elite AI coding agent embedded in a browser-based IDE. You write production-quality code and modify the user's project in real time.
+
+## Project
+${paths.length} file(s) in the workspace root:
+${paths.slice(0, 400).map(p => '- ' + p).join('\n') || '(empty project)'}
+`;
+
+  if (active && typeof state.files.get(active)?.content === 'string') {
+    const c = state.files.get(active).content;
+    s += `
+## Currently open file: ${active}
+\`\`\`${langFromPath(active)}
+${c.slice(0, 14000)}${c.length > 14000 ? '\n/* … truncated … */' : ''}
+\`\`\`
+`;
+  }
+
+  s += `
+## How to modify files (VERY IMPORTANT)
+To create or overwrite a file, emit a block exactly like this:
+
+<chese-write path="src/App.tsx">
+// full file contents go here
+</chese-write>
+
+Rules:
+1. ALWAYS output the COMPLETE file content inside the block. Never use placeholders such as "// ... rest of the code unchanged" — the entire file is replaced.
+2. Use forward slashes in paths ("src/components/Button.tsx"). Folders are created implicitly.
+3. To delete a file: <chese-delete path="src/old.ts" />
+4. You may emit several blocks in a single reply, plus short prose before/after them.
+5. Keep explanations concise and practical. Use markdown for prose.
+6. If you need to see a file that is not open, ask the user to open it, or state your assumption explicitly.
+7. Prefer complete, runnable implementations over fragments.`;
+
+  return s;
+}
+
+function buildMessages() {
+  const msgs = [{ role: 'system', content: buildSystemPrompt() }];
+  const hist = state.chat.filter(m => m.role === 'user' || m.role === 'assistant').slice(-24);
+  for (const m of hist) {
+    const text = m.role === 'assistant' ? (m.content || '') : m.content;
+    if (!text) continue;
+    msgs.push({ role: m.role, content: text });
+  }
+  return msgs;
+}
+
+/* ---------------- Effort params ---------------- */
+const EFFORT_LEVELS = ['auto', 'low', 'medium', 'high', 'xhigh', 'max'];
+
+function detectModelFamily(model) {
+  const m = (model || '').toLowerCase();
+  // OpenAI reasoning models: o1, o3, o4 (and variants like o1-mini, o3-mini, o4-mini, openai/o3, etc.)
+  if (/(\b|\/)(o[134](-mini|-pro|-high|-preview|-turbo)?)\b/.test(m) || m.includes('reasoning')) return 'openai-reasoning';
+  // Anthropic Claude
+  if (m.includes('claude')) return 'claude';
+  // Google Gemini with thinking
+  if (m.includes('gemini') && (m.includes('think') || m.includes('2.0-flash'))) return 'gemini-thinking';
+  // DeepSeek R-series
+  if (m.includes('deepseek-r') || (m.includes('deepseek') && m.includes('reason'))) return 'deepseek-reasoning';
+  // Qwen QwQ / thinking
+  if (m.includes('qwq') || (m.includes('qwen') && m.includes('think'))) return 'qwen-thinking';
+  return 'generic';
+}
+
+function buildEffortParams() {
+  const effort = state.settings.effort || 'auto';
+  if (effort === 'auto') return {};
+  const family = detectModelFamily(state.settings.model);
+
+  // Map 6 effort levels to provider-specific values
+  const openaiMap  = { low:'low', medium:'medium', high:'high', xhigh:'high', max:'high' };
+  // Claude extended thinking budget tokens
+  const claudeMap  = { low:1500, medium:5000, high:10000, xhigh:20000, max:38000 };
+  // Generic reasoning effort (passes through on OpenRouter for many models)
+  const genericMap = { low:'low', medium:'medium', high:'high', xhigh:'high', max:'high' };
+
+  if (family === 'openai-reasoning') {
+    return { reasoning_effort: openaiMap[effort] || 'medium' };
+  }
+  if (family === 'claude') {
+    return { thinking: { type: 'enabled', budget_tokens: claudeMap[effort] || 5000 } };
+  }
+  if (family === 'gemini-thinking') {
+    const thinkingBudgets = { low:512, medium:2048, high:8192, xhigh:16384, max:32768 };
+    return { generationConfig: { thinkingConfig: { thinkingBudget: thinkingBudgets[effort] || 2048 } } };
+  }
+  if (family === 'deepseek-reasoning' || family === 'qwen-thinking') {
+    // These models auto-reason but some endpoints accept reasoning_effort
+    return { reasoning_effort: genericMap[effort] || 'medium' };
+  }
+  // Generic: try reasoning_effort (works on many OpenRouter models)
+  return { reasoning_effort: genericMap[effort] || 'medium' };
+}
+
+function effortParamHint() {
+  const effort = state.settings.effort || 'auto';
+  if (effort === 'auto') return 'No extra reasoning params — model decides';
+  const family = detectModelFamily(state.settings.model);
+  const params = buildEffortParams();
+  if (family === 'openai-reasoning') return `reasoning_effort: "${params.reasoning_effort}"`;
+  if (family === 'claude') return `thinking.budget_tokens: ${params.thinking?.budget_tokens}`;
+  if (family === 'gemini-thinking') return `thinkingBudget: ${params.generationConfig?.thinkingConfig?.thinkingBudget}`;
+  if (!state.settings.model) return 'Select a model to see param details';
+  return `reasoning_effort: "${params.reasoning_effort}" (generic/OpenRouter)`;
+}
+
+function applyEffortUI() {
+  const effort = state.settings.effort || 'auto';
+  const btn = $('#effort-btn');
+  if (!btn) return;
+  // Remove all effort classes
+  EFFORT_LEVELS.forEach(l => btn.classList.remove('effort-' + l));
+  btn.classList.add('effort-' + effort);
+  $('#effort-label').textContent = effort;
+  // Update tooltip with active param hint
+  btn.title = `Reasoning effort — click to cycle\nauto → low → medium → high → xhigh → max\n\nActive: ${effortParamHint()}`;
+}
+
+/* ---------------- Sending ---------------- */
+let streamRenderTimer = null;
+
+function scheduleStreamRender(msg) {
+  if (streamRenderTimer) return;
+  streamRenderTimer = setTimeout(() => {
+    streamRenderTimer = null;
+    const el = document.querySelector(`[data-mid="${msg.id}"]`);
+    if (!el) { renderChat(); return; }
+    const bodyEl = el.querySelector('.msg-body');
+    if (bodyEl) {
+      const text = msg.clean != null ? msg.clean : (msg.content || '');
+      bodyEl.innerHTML = md(text) || (msg.streaming ? '<span class="cursor-blink">▍</span>' : '');
+    }
+    // live chip
+    const oldChip = el.querySelector('.live-chip');
+    if (oldChip) oldChip.remove();
+    if (msg.streaming && msg.live) {
+      const chip = document.createElement('div');
+      chip.className = 'live-chip';
+      chip.innerHTML = `✏️ Writing <code class="ic">${esc(msg.live.path)}</code><span class="cursor-blink">▍</span>`;
+      bodyEl.parentElement.insertBefore(chip, bodyEl.nextSibling);
+    }
+    // ops
+    const existing = [...el.querySelectorAll('.op-card')].map(n => n.dataset.op);
+    for (const op of (msg.ops || [])) {
+      if (existing.includes(op.id)) continue;
+      const wrap = document.createElement('div');
+      wrap.innerHTML = opCard(op);
+      el.appendChild(wrap.firstElementChild);
+    }
+    const box = $('#messages');
+    const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 220;
+    if (nearBottom) scrollChat();
+  }, 70);
+}
+
+let opLock = false;
+async function processOps(msg) {
+  if (opLock) return;
+  opLock = true;
+  try {
+    const { clean, ops } = parseBlocks(msg.content || '');
+    msg.clean = clean;
+    msg.live = ops.find(o => !o.complete) || null;
+    msg._seen = msg._seen || new Set();
+    for (const op of ops) {
+      if (!op.complete) continue;
+      if (msg._seen.has(op.start)) continue;
+      msg._seen.add(op.start);
+      const rec = {
+        id: uid(),
+        kind: op.kind,
+        path: op.path.replace(/^\.?\//, ''),
+        content: op.content.replace(/^\n/, ''),
+        status: 'pending',
+        prev: null,
+      };
+      msg.ops.push(rec);
+      if (state.settings.autoApply) await applyOp(rec, false);
+    }
+  } finally {
+    opLock = false;
+  }
+}
+
+async function sendMessage() {
+  if (state.streaming) return;
+  const input = $('#chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+
+  if (!state.settings.apiKey) {
+    toast('Add your API key in Settings to start.', 'warn');
+    openSettings();
+    return;
+  }
+  if (!state.settings.model) {
+    toast('Select or enter a model first.', 'warn');
+    openSettings();
+    return;
+  }
+
+  input.value = '';
+  autoGrow(input);
+
+  state.chat.push({ id: uid(), role: 'user', content: text });
+  const assistant = { id: uid(), role: 'assistant', content: '', ops: [], streaming: true, live: null };
+  state.chat.push(assistant);
+  renderChat();
+
+  state.streaming = true;
+  updateStatusBar();
+  updateSendButton();
+
+  const ctrl = new AbortController();
+  state.abort = ctrl;
+
+  try {
+    const res = await fetch(apiUrl('/chat/completions'), {
+      method: 'POST',
+      headers: authHeaders(),
+      signal: ctrl.signal,
+      body: JSON.stringify({
+        model: state.settings.model,
+        messages: buildMessages(),
+        stream: true,
+        temperature: Number(state.settings.temperature) || 0,
+        ...buildEffortParams(),
+      }),
+    });
+
+    if (!res.ok) {
+      const t = await res.text().catch(() => '');
+      throw new Error(`HTTP ${res.status} — ${t.slice(0, 400) || res.statusText}`);
+    }
+    if (!res.body) throw new Error('Streaming not supported by this endpoint.');
+
+    state.connected = true;
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop() || '';
+      for (const raw of lines) {
+        const line = raw.trim();
+        if (!line || !line.startsWith('data:')) continue;
+        const payload = line.slice(5).trim();
+        if (payload === '[DONE]') continue;
+        try {
+          const j = JSON.parse(payload);
+          const delta = j.choices?.[0]?.delta?.content;
+          if (delta) {
+            assistant.content += delta;
+            await processOps(assistant);
+            scheduleStreamRender(assistant);
+          }
+        } catch (e) { /* ignore malformed chunk */ }
+      }
+    }
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      assistant.content += '\n\n_(stopped)_';
+    } else {
+      assistant.content += `\n\n**Error:** ${e.message}`;
+      toast(e.message, 'error', 6000);
+      state.connected = false;
+    }
+  } finally {
+    assistant.streaming = false;
+    assistant.live = null;
+    state.streaming = false;
+    state.abort = null;
+    await processOps(assistant);
+    const { clean } = parseBlocks(assistant.content);
+    assistant.clean = clean;
+    renderChat();
+    updateStatusBar();
+    updateSendButton();
+    saveChats(); // also triggers archive save
+  }
+}
+
+function updateSendButton() {
+  const btn = $('#btn-send');
+  const stop = $('#btn-stop');
+  if (state.streaming) { btn.classList.add('hidden'); stop.classList.remove('hidden'); }
+  else { btn.classList.remove('hidden'); stop.classList.add('hidden'); }
+}
+
+$('#btn-send').addEventListener('click', sendMessage);
+$('#btn-stop').addEventListener('click', () => { state.abort?.abort(); });
+
+const inputEl = $('#chat-input');
+function autoGrow(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 190) + 'px';
+}
+inputEl.addEventListener('input', () => autoGrow(inputEl));
+inputEl.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+/* ---------------- Settings ---------------- */
+function openSettings() {
+  syncSettingsUI();
+  const modal = $('#settings-modal');
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+}
+function closeSettings() {
+  const modal = $('#settings-modal');
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+}
+
+$('#btn-settings').addEventListener('click', openSettings);
+$('#set-close').addEventListener('click', closeSettings);
+$('#set-cancel').addEventListener('click', closeSettings);
+$('#settings-modal').addEventListener('click', (e) => { if (e.target.id === 'settings-modal') closeSettings(); });
+
+$('#set-key-toggle').addEventListener('click', () => {
+  const el = $('#set-key');
+  const showing = el.type === 'text';
+  el.type = showing ? 'password' : 'text';
+  $('#set-key-toggle').textContent = showing ? 'Show' : 'Hide';
+});
+
+$$('.preset').forEach(b => b.addEventListener('click', () => {
+  $('#set-base').value = b.dataset.base;
+}));
+
+$('#set-save').addEventListener('click', () => {
+  state.settings.baseUrl = $('#set-base').value.trim() || 'https://openrouter.ai/api/v1';
+  state.settings.apiKey = $('#set-key').value.trim();
+  state.settings.model = $('#set-model').value.trim();
+  state.settings.temperature = clamp(parseFloat($('#set-temp').value) || 0, 0, 2);
+  state.settings.googleClientId = $('#set-gcid').value.trim();
+  state.settings.autoApply = $('#set-autoapply').value === 'true';
+  const asEl = $('#set-autosave');
+  if (asEl) state.settings.autoArchive = asEl.checked;
+  saveSettings();
+  syncModelSelect();
+  applyEffortUI();
+  $('#autoapply').checked = state.settings.autoApply;
+  updateStatusBar();
+  updateCtxHint();
+  closeSettings();
+  toast('Settings saved', 'success');
+  state.connected = !!state.settings.apiKey;
+  updateStatusBar();
+  scheduleArchiveSave(600);
+});
+
+$('#set-clear').addEventListener('click', () => {
+  state.settings.apiKey = '';
+  state.settings.model = '';
+  $('#set-key').value = '';
+  $('#set-model').value = '';
+  $('#set-model-list').classList.add('hidden');
+  $('#set-model-status').textContent = '';
+  saveSettings();
+  syncModelSelect();
+  updateStatusBar();
+  toast('Credentials cleared', 'info');
+});
+
+$('#set-fetch').addEventListener('click', async () => {
+  const btn = $('#set-fetch');
+  const base = $('#set-base').value.trim() || 'https://openrouter.ai/api/v1';
+  const key = $('#set-key').value.trim();
+  const statusEl = $('#set-model-status');
+  btn.disabled = true;
+  const orig = btn.innerHTML;
+  btn.innerHTML = 'Fetching…';
+  statusEl.textContent = 'Contacting ' + base + ' …';
+  statusEl.style.color = '#6b7690';
+  try {
+    const list = await fetchModelsFrom(base, key);
+    state.models = list;
+    const sel = $('#set-model-list');
+    sel.innerHTML = `<option value="">— ${list.length} models available —</option>` +
+      list.map(m => `<option value="${esc(m.id)}">${esc(m.name)}</option>`).join('');
+    sel.classList.remove('hidden');
+    statusEl.textContent = `✓ Found ${list.length} models. Pick one below.`;
+    statusEl.style.color = '#34d399';
+    syncModelSelect();
+    toast(`Fetched ${list.length} models`, 'success');
+    scheduleArchiveSave(400);
+  } catch (e) {
+    statusEl.textContent = '✕ ' + e.message;
+    statusEl.style.color = '#f06060';
+    toast('Model fetch failed: ' + e.message, 'error', 5000);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }
+});
+
+$('#set-model-list').addEventListener('change', (e) => {
+  if (e.target.value) $('#set-model').value = e.target.value;
+});
+
+$('#set-autosave')?.addEventListener('change', (e) => {
+  state.settings.autoArchive = e.target.checked;
+  saveSettings();
+  if (e.target.checked && Drive.token) scheduleArchiveSave(400);
+  toast(e.target.checked ? 'Auto-archive enabled' : 'Auto-archive disabled', 'info', 2200);
+});
+
+/* Archive buttons inside Settings */
+$('#set-archive-save').addEventListener('click', async () => {
+  if (!Drive.token) {
+    toast('Connect Google Drive first (button in the sidebar)', 'warn', 4500);
+    return;
+  }
+  state.archiveDirty = true;
+  await saveCheseArchive({ silent: false, force: true });
+});
+
+$('#set-archive-load').addEventListener('click', async () => {
+  if (!Drive.token) {
+    toast('Connect Google Drive first (button in the sidebar)', 'warn', 4500);
+    return;
+  }
+  await loadCheseArchive({ silent: false });
+  closeSettings();
+});
+
+function syncModelSelect() {
+  const sel = $('#model-select');
+  const current = state.settings.model;
+  const list = state.models.length ? state.models : (current ? [{ id: current, name: current }] : []);
+  sel.innerHTML = '<option value="">— no model —</option>' +
+    list.map(m => `<option value="${esc(m.id)}" ${m.id === current ? 'selected' : ''}>${esc(m.name)}</option>`).join('');
+  if (current && !list.some(m => m.id === current)) {
+    sel.innerHTML += `<option value="${esc(current)}" selected>${esc(current)}</option>`;
+  }
+  sel.value = current || '';
+}
+
+$('#model-select').addEventListener('change', (e) => {
+  state.settings.model = e.target.value;
+  saveSettings();
+  updateStatusBar();
+  updateCtxHint();
+  applyEffortUI(); // tooltip hint may change based on model family
+  toast(state.settings.model ? 'Model: ' + state.settings.model : 'No model selected', 'info', 2200);
+});
+
+/* ---------------- Effort toggle ---------------- */
+$('#effort-btn').addEventListener('click', () => {
+  const idx = EFFORT_LEVELS.indexOf(state.settings.effort || 'auto');
+  state.settings.effort = EFFORT_LEVELS[(idx + 1) % EFFORT_LEVELS.length];
+  saveSettings();
+  applyEffortUI();
+  const effort = state.settings.effort;
+  const hint = effort === 'auto' ? 'Effort: auto (no extra params)' : `Effort: ${effort} — ${effortParamHint()}`;
+  toast(hint, 'info', 2800);
+});
+
+/* ---------------- Auto-apply toggle ---------------- */
+$('#autoapply').addEventListener('change', (e) => {
+  state.settings.autoApply = e.target.checked;
+  $('#set-autoapply').value = String(e.target.checked);
+  saveSettings();
+  toast(e.target.checked ? 'Auto-apply enabled' : 'Review mode: edits wait for approval', 'info', 2400);
+});
+
+/* ---------------- Chat management ---------------- */
+function newChat() {
+  if (state.chat.length) saveChats();
+  state.chat = [];
+  state.chatId = uid();
+  renderChat();
+  updateCtxHint();
+  scheduleArchiveSave(400);
+}
+
+$('#btn-new-chat').addEventListener('click', () => { newChat(); toast('New conversation', 'info', 1800); });
+$('#btn-clear-chat').addEventListener('click', () => { newChat(); });
+
+$('#btn-history').addEventListener('click', () => {
+  const list = $('#hist-list');
+  if (!state.chats.length) {
+    list.innerHTML = `<div class="text-center text-[12px] text-slate-600 py-8">No saved conversations yet.</div>`;
+  } else {
+    list.innerHTML = state.chats.map(c => `
+      <div class="hist-item flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer hover:bg-white/[.05] transition" data-id="${c.id}">
+        <div class="flex-1 min-w-0">
+          <div class="text-[12.5px] text-slate-300 truncate">${esc(c.title)}</div>
+          <div class="text-[10px] text-slate-600">${new Date(c.updated).toLocaleString()} · ${c.messages.length} messages</div>
+        </div>
+        <button class="icon-btn hist-del" data-del="${c.id}" title="Delete">✕</button>
+      </div>`).join('');
+  }
+  const modal = $('#history-modal');
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+});
+
+$('#hist-close').addEventListener('click', () => {
+  const modal = $('#history-modal');
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+});
+$('#history-modal').addEventListener('click', (e) => {
+  if (e.target.id === 'history-modal') {
+    e.target.classList.add('hidden');
+    e.target.classList.remove('flex');
+  }
+});
+
+$('#hist-list').addEventListener('click', (e) => {
+  const del = e.target.closest('[data-del]');
+  if (del) {
+    e.stopPropagation();
+    state.chats = state.chats.filter(c => c.id !== del.dataset.del);
+    localStorage.setItem(LS_CHATS, JSON.stringify(state.chats));
+    $('#btn-history').click();
+    scheduleArchiveSave(400);
+    return;
+  }
+  const item = e.target.closest('.hist-item');
+  if (item) {
+    const c = state.chats.find(x => x.id === item.dataset.id);
+    if (!c) return;
+    state.chatId = c.id;
+    state.chat = c.messages.map(m => ({ ...m, ops: [], streaming: false }));
+    renderChat();
+    $('#history-modal').classList.add('hidden');
+    $('#history-modal').classList.remove('flex');
+    scheduleArchiveSave(400);
+  }
+});
+
+/* ---------------- Workspace actions ---------------- */
+$('#btn-open-folder').addEventListener('click', async () => {
+  try {
+    await FS.openDirectory();
+    state.tabs = [];
+    state.active = null;
+    editorModels.forEach(m => m.dispose());
+    editorModels.clear();
+    if (monacoReady) editor.setModel(null);
+    showWelcome();
+    renderTabs();
+    renderTree();
+    updateStatusBar();
+    updateCtxHint();
+    toast(`Opened folder — ${state.files.size} files`, 'success');
+  } catch (e) {
+    if (e.name !== 'AbortError') toast(e.message, 'error');
+  }
+});
+
+$('#btn-connect-drive').addEventListener('click', async () => {
+  const btn = $('#btn-connect-drive');
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = 'Connecting…';
+  try {
+    await Drive.connect();
+    FS.kind = 'drive';
+    const list = await Drive.list();
+    state.files.clear();
+    for (const f of list) {
+      if (f.name === CHEESE_ARCHIVE_NAME) continue; // don't show archive in tree
+      state.files.set(f.name, { content: null, driveId: f.id });
+    }
+    state.tabs = [];
+    state.active = null;
+    editorModels.forEach(m => m.dispose());
+    editorModels.clear();
+    if (monacoReady) editor.setModel(null);
+    showWelcome();
+    renderTabs();
+    renderTree();
+    updateStatusBar();
+    updateCtxHint();
+    toast(`Connected to Drive — ${list.length} files`, 'success');
+
+    // Auto-load archive if one exists
+    try {
+      const existing = await Drive.findByName(CHEESE_ARCHIVE_NAME);
+      if (existing) {
+        state.archiveFileId = existing.id;
+        const ok = await loadCheseArchive({ silent: true });
+        if (ok) toast('Chese archive auto-loaded from Drive', 'success', 4500);
+        else setArchivePill('', 'ready');
+      } else {
+        setArchivePill('', 'no archive');
+        // First time: save current state as the archive
+        setTimeout(() => { state.archiveDirty = true; saveCheseArchive({ silent: true, force: true }); }, 900);
+      }
+    } catch (e) { /* non-fatal */ }
+  } catch (e) {
+    toast('Drive error: ' + e.message, 'error', 6000);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }
+});
+
+$('#btn-refresh').addEventListener('click', async () => {
+  try {
+    if (FS.kind === 'drive' && Drive.token) {
+      const list = await Drive.list();
+      const keep = new Map();
+      for (const f of list) {
+        if (f.name === CHEESE_ARCHIVE_NAME) continue;
+        keep.set(f.name, { content: state.files.get(f.name)?.content ?? null, driveId: f.id });
+      }
+      state.files = keep;
+    } else if (FS.kind === 'dir' && FS.rootHandle) {
+      state.files.clear();
+      await FS._scan(FS.rootHandle, '');
+    } else {
+      FS.loadVirtual();
+    }
+    renderTree();
+    toast('Workspace refreshed', 'info', 1800);
+  } catch (e) {
+    toast('Refresh failed: ' + e.message, 'error');
+  }
+});
+
+$('#btn-new-file').addEventListener('click', async () => {
+  const path = prompt('New file path (e.g. src/components/Button.tsx):');
+  if (!path) return;
+  const clean = path.trim().replace(/^\.?\//, '');
+  if (!clean) return;
+  if (state.files.has(clean)) { toast('File already exists', 'warn'); openFile(clean); return; }
+  state.files.set(clean, { content: '' });
+  try { await FS.write(clean, ''); } catch (e) { toast('Could not create on disk: ' + e.message, 'warn'); }
+  renderTree();
+  await openFile(clean);
+  toast('Created ' + clean, 'success');
+});
+
+$('#btn-zip').addEventListener('click', async () => {
+  if (!state.files.size) { toast('No files to export', 'warn'); return; }
+  const zip = new JSZip();
+  let n = 0;
+  for (const [path, f] of state.files) {
+    let content = f.content;
+    if (content == null && f.driveId) {
+      try { content = await Drive.read(f.driveId); } catch (e) { content = ''; }
+    }
+    zip.file(path, content ?? '');
+    n++;
+  }
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'chese-project.zip';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast(`Exported ${n} files as ZIP`, 'success');
+});
+
+/* ---------------- Theme toggle ---------------- */
+function currentMonacoTheme() {
+  return document.documentElement.classList.contains('dark') ? 'chese-dark' : 'chese-light';
+}
+
+function applyTheme(isDark) {
+  if (isDark) {
+    document.documentElement.classList.add('dark');
+    document.documentElement.classList.remove('light');
+    $('#theme-sun').classList.remove('hidden');
+    $('#theme-moon').classList.add('hidden');
+  } else {
+    document.documentElement.classList.remove('dark');
+    document.documentElement.classList.add('light');
+    $('#theme-sun').classList.add('hidden');
+    $('#theme-moon').classList.remove('hidden');
+  }
+  if (monacoReady) monaco.editor.setTheme(isDark ? 'chese-dark' : 'chese-light');
+  try { localStorage.setItem('chese.theme', isDark ? 'dark' : 'light'); } catch(e) {}
+}
+
+$('#btn-theme').addEventListener('click', () => {
+  applyTheme(!document.documentElement.classList.contains('dark'));
+});
+
+/* ---------------- Console panel ---------------- */
+let _consoleVisible = false;
+
+function showConsole() {
+  const p = $('#console-panel');
+  p.style.display = 'flex';
+  _consoleVisible = true;
+}
+function hideConsole() {
+  const p = $('#console-panel');
+  p.style.display = 'none';
+  _consoleVisible = false;
+}
+function toggleConsole() {
+  if (_consoleVisible) hideConsole(); else showConsole();
+}
+function clearConsole() {
+  $('#console-output').innerHTML = '';
+}
+
+const _levelPfx = { log:'●', warn:'▲', error:'✕', info:'ℹ', success:'✓' };
+
+function logToConsole(level, text) {
+  const out = $('#console-output');
+  const line = document.createElement('div');
+  line.className = 'console-line console-line-' + (level || 'log');
+  const ts = new Date().toLocaleTimeString('en-US',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const pfx = _levelPfx[level] || '●';
+  line.innerHTML =
+    '<span class="console-ts">[' + ts + ']</span>' +
+    '<span class="console-prefix">' + pfx + '</span>' +
+    '<span class="console-text">' + esc(String(text)) + '</span>';
+  out.appendChild(line);
+  out.scrollTop = out.scrollHeight;
+}
+
+$('#btn-toggle-console').addEventListener('click', toggleConsole);
+$('#btn-console-close').addEventListener('click', hideConsole);
+$('#btn-console-clear').addEventListener('click', clearConsole);
+
+/* iframe → parent postMessage bridge */
+window.addEventListener('message', (e) => {
+  if (!e.data || e.data.type !== 'chese-console') return;
+  logToConsole(e.data.level || 'log', e.data.text || '');
+});
+
+/* Console panel drag-to-resize */
+(function() {
+  const handle = $('#console-resize-handle');
+  let dragging = false, startY = 0, startH = 0;
+  handle.addEventListener('mousedown', (e) => {
+    dragging = true;
+    startY = e.clientY;
+    startH = $('#console-panel').offsetHeight;
+    document.body.style.cursor = 'ns-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', (e) => {
+    if (!dragging) return;
+    const delta = startY - e.clientY;          // drag up → taller
+    const panel = $('#console-panel');
+    const maxH = window.innerHeight * 0.6;
+    panel.style.height = Math.max(80, Math.min(maxH, startH + delta)) + 'px';
+  });
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+  });
+})();
+
+/* ---------------- Run current file ---------------- */
+function runCurrentFile() {
+  const path = state.active;
+  if (!path) { toast('Open a file to run it', 'warn', 2200); return; }
+  const content = state.files.get(path)?.content;
+  if (content == null) { toast('File has no content', 'warn', 2200); return; }
+
+  const ext = (path.split('.').pop() || '').toLowerCase();
+
+  showConsole();
+  clearConsole();
+  $('#console-run-file').textContent = path;
+  logToConsole('info', 'Running ' + path + ' …');
+
+  const runBtn = $('#btn-run');
+  runBtn.classList.add('running');
+  setTimeout(() => runBtn.classList.remove('running'), 1500);
+
+  if (['html','htm'].includes(ext))       { _runHtml(content, path); }
+  else if (['js','mjs','cjs','jsx'].includes(ext)) { _runJs(content, path); }
+  else if (['ts','tsx'].includes(ext)) {
+    logToConsole('warn', 'TypeScript must be transpiled before running.');
+    logToConsole('info', 'Tip: rename to .js and remove type annotations, or add a transpile step.');
+  } else if (ext === 'py') {
+    logToConsole('warn', 'Python cannot run directly in the browser.');
+    logToConsole('info', 'Tip: use Pyodide (pyodide.org) or a local terminal.');
+  } else {
+    logToConsole('warn', 'No runner for .' + ext + ' files.');
+    logToConsole('info', 'JS and HTML files can be executed here.');
+  }
+}
+
+function _consoleCapture() {
+  return `<script>
+(function(){
+  const _post=(lv,args)=>{
+    const text=Array.from(args).map(a=>{
+      if(a instanceof Error)return a.stack||a.message;
+      if(typeof a==='object'&&a!==null){try{return JSON.stringify(a,null,2);}catch(e){return String(a);}}
+      return String(a);
+    }).join(' ');
+    try{window.parent.postMessage({type:'chese-console',level:lv,text},'*');}catch(_){}
+  };
+  ['log','warn','error','info'].forEach(k=>{const o=console[k];console[k]=(...a)=>{_post(k,a);};});
+  window.onerror=(m,s,l,c,e)=>{_post('error',[e?e.stack||e.message:m+' (line '+l+')']);return true;};
+  window.onunhandledrejection=(e)=>{_post('error',['Unhandled promise: '+(e.reason?.stack||e.reason?.message||String(e.reason))]);};
+})();
+<\/script>`;
+}
+
+function _runJs(code, path) {
+  const iframe = $('#run-iframe');
+  iframe.src = 'about:blank';
+  const page = `<!DOCTYPE html><html><head>${_consoleCapture()}</head><body><script>
+try{
+${code}
+}catch(e){console.error(e.stack||e.message);}
+<\/script></body></html>`;
+  const blob = new Blob([page], {type:'text/html'});
+  const url  = URL.createObjectURL(blob);
+  iframe.src = url;
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+function _runHtml(code, path) {
+  const iframe = $('#run-iframe');
+  iframe.src = 'about:blank';
+  const cap = _consoleCapture();
+  let injected = code;
+  if (/<head[^>]*>/i.test(injected))
+    injected = injected.replace(/(<head[^>]*>)/i, '$1' + cap);
+  else if (/<body[^>]*>/i.test(injected))
+    injected = injected.replace(/(<body[^>]*>)/i, '$1' + cap);
+  else
+    injected = cap + injected;
+  const blob = new Blob([injected], {type:'text/html'});
+  const url  = URL.createObjectURL(blob);
+  iframe.src = url;
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  logToConsole('log', 'HTML file loaded — console.log output will appear here.');
+}
+
+$('#btn-run').addEventListener('click', runCurrentFile);
+
+/* ---------------- Context hint ---------------- */
+function updateCtxHint() {
+  const n = state.files.size;
+  const active = state.active ? state.active.split('/').pop() : null;
+  const parts = [];
+  parts.push(`${n} file${n === 1 ? '' : 's'}`);
+  if (active) parts.push(`↳ ${active}`);
+  $('#ctx-hint').textContent = parts.join('  ·  ');
+}
+
+/* ---------------- Chese Load / Save buttons ---------------- */
+$('#btn-chese-load').addEventListener('click', async () => {
+  if (!Drive.token) {
+    toast('Connect Google Drive first to load chese.json', 'warn', 4500);
+    // Nudge: scroll/highlight the Drive connect button
+    const db = $('#btn-connect-drive');
+    db.style.transition = 'all .25s';
+    db.style.boxShadow = '0 0 0 3px rgba(124,92,255,.45)';
+    setTimeout(() => { db.style.boxShadow = ''; }, 1800);
+    return;
+  }
+  const btn = $('#btn-chese-load');
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="spinning"><path d="M21 12a9 9 0 11-3-6.7M21 3v6h-6"/></svg> Loading…';
+  try {
+    await loadCheseArchive({ silent: false });
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }
+});
+
+$('#btn-chese-save').addEventListener('click', async () => {
+  if (!Drive.token) {
+    toast('Connect Google Drive first to save chese.json', 'warn', 4500);
+    const db = $('#btn-connect-drive');
+    db.style.transition = 'all .25s';
+    db.style.boxShadow = '0 0 0 3px rgba(124,92,255,.45)';
+    setTimeout(() => { db.style.boxShadow = ''; }, 1800);
+    return;
+  }
+  const btn = $('#btn-chese-save');
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="spinning"><path d="M21 12a9 9 0 11-3-6.7M21 3v6h-6"/></svg> Saving…';
+  state.archiveDirty = true;
+  try {
+    await saveCheseArchive({ silent: false, force: true });
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = orig;
+  }
+});
+
+/* ---------------- Keyboard shortcuts ---------------- */
+document.addEventListener('keydown', (e) => {
+  const mod = e.ctrlKey || e.metaKey;
+
+  if (mod && e.key.toLowerCase() === 's') {
+    e.preventDefault();
+    const path = state.active;
+    if (!path) { toast('No file open', 'warn', 1600); return; }
+    (async () => {
+      try {
+        setSaveStatus('saving');
+        await FS.write(path, state.files.get(path)?.content ?? '');
+        setSaveStatus('saved');
+        toast('Saved ' + path, 'success', 1600);
+      } catch (err) { setSaveStatus('error'); toast('Save failed: ' + err.message, 'error'); }
+    })();
+    return;
+  }
+
+  if (mod && e.key.toLowerCase() === 'b') {
+    e.preventDefault();
+    const sb = $('#sidebar');
+    sb.style.display = sb.style.display === 'none' ? '' : 'none';
+    return;
+  }
+
+  if (mod && e.key.toLowerCase() === 'j') {
+    e.preventDefault();
+    const cp = $('#chatpane');
+    cp.style.display = cp.style.display === 'none' ? '' : 'none';
+    return;
+  }
+
+  if (mod && e.shiftKey && e.key.toLowerCase() === 'n') {
+    e.preventDefault();
+    newChat();
+    return;
+  }
+
+  if (mod && e.shiftKey && e.key.toLowerCase() === 'l') {
+    e.preventDefault();
+    $('#btn-chese-load').click();
+    return;
+  }
+
+  if (mod && e.shiftKey && e.key.toLowerCase() === 's') {
+    e.preventDefault();
+    $('#btn-chese-save').click();
+    return;
+  }
+
+  // Run current file
+  if (mod && !e.shiftKey && e.key.toLowerCase() === 'r') {
+    e.preventDefault();
+    runCurrentFile();
+    return;
+  }
+
+  // Toggle console panel
+  if (mod && e.key === '`') {
+    e.preventDefault();
+    toggleConsole();
+    return;
+  }
+
+  if (mod && e.key === ',') {
+    e.preventDefault();
+    openSettings();
+    return;
+  }
+
+  if (e.key === 'Escape') {
+    closeSettings();
+    closeDiff();
+    const hm = $('#history-modal');
+    hm.classList.add('hidden'); hm.classList.remove('flex');
+  }
+});
+
+/* ---------------- Init ---------------- */
+async function init() {
+  loadSettings();
+  loadChats();
+
+  // Restore theme preference (default: dark)
+  const _savedTheme = localStorage.getItem('chese.theme');
+  applyTheme(!_savedTheme || _savedTheme === 'dark');
+
+  $('#autoapply').checked = state.settings.autoApply;
+  $('#set-autoapply').value = String(state.settings.autoApply);
+  const as = $('#set-autosave');
+  if (as) as.checked = state.settings.autoArchive !== false;
+
+  syncModelSelect();
+  syncSettingsUI();
+  applyEffortUI();
+
+  FS.loadVirtual();
+  renderTree();
+  renderTabs();
+  renderChat();
+  updateCtxHint();
+  updateStatusBar();
+  updateSendButton();
+
+  if (!state.settings.apiKey || !state.settings.model) {
+    setTimeout(() => {
+      toast('Configure your AI provider to get started.', 'info', 5000);
+    }, 900);
+  }
+
+  // Warn before leaving if archive dirty
+  window.addEventListener('beforeunload', (e) => {
+    if (state.archiveDirty && Drive.token && state.settings.autoArchive) {
+      saveCheseArchive({ silent: true }).catch(() => {});
+    }
+  });
+}
+
+window.Chese = {
+  state, FS, Drive,
+  openFile, applyOp,
+  saveCheseArchive, loadCheseArchive,
+  get editor() { return editor; },
+};
+
+init();
+</script>
+</body>
+</html>

@@ -355,7 +355,7 @@
           <button id="btn-run"
             class="btn !py-1 !px-2.5 !text-[11px] !font-semibold"
             style="color:#34d399;border-color:rgba(52,211,153,.25);background:rgba(52,211,153,.07)"
-            title="Run file (Ctrl+R)">
+            title="Run file (Ctrl+R) — JS &amp; HTML run in browser sandbox · 60+ languages via Piston API">
             <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5,3 19,12 5,21"/></svg>
             Run
           </button>
@@ -2662,6 +2662,150 @@ window.addEventListener('message', (e) => {
   });
 })();
 
+/* ---------------- Piston remote executor ---------------- */
+/* https://github.com/engineer-man/piston  —  free, no auth needed */
+const PISTON_URL = 'https://emkc.org/api/v2/piston/execute';
+
+/*
+ * Extension → { language, version, filename }
+ * version '*' = latest available on Piston.
+ * filename matters for Java (class name must match file name).
+ */
+const PISTON_MAP = {
+  /* Systems */
+  cpp:    { language: 'c++',          version: '*', filename: 'main.cpp'   },
+  cc:     { language: 'c++',          version: '*', filename: 'main.cpp'   },
+  cxx:    { language: 'c++',          version: '*', filename: 'main.cpp'   },
+  c:      { language: 'c',            version: '*', filename: 'main.c'     },
+  h:      { language: 'c',            version: '*', filename: 'main.c'     },
+  rs:     { language: 'rust',         version: '*', filename: 'main.rs'    },
+  go:     { language: 'go',           version: '*', filename: 'main.go'    },
+  zig:    { language: 'zig',          version: '*', filename: 'main.zig'   },
+  d:      { language: 'd',            version: '*', filename: 'main.d'     },
+  /* JVM */
+  java:   { language: 'java',         version: '*', filename: 'Main.java'  },
+  kt:     { language: 'kotlin',       version: '*', filename: 'main.kt'    },
+  scala:  { language: 'scala',        version: '*', filename: 'main.scala' },
+  groovy: { language: 'groovy',       version: '*', filename: 'main.groovy'},
+  /* Scripted */
+  py:     { language: 'python',       version: '*', filename: 'main.py'    },
+  rb:     { language: 'ruby',         version: '*', filename: 'main.rb'    },
+  php:    { language: 'php',          version: '*', filename: 'main.php'   },
+  pl:     { language: 'perl',         version: '*', filename: 'main.pl'    },
+  lua:    { language: 'lua',          version: '*', filename: 'main.lua'   },
+  r:      { language: 'r',            version: '*', filename: 'main.r'     },
+  jl:     { language: 'julia',        version: '*', filename: 'main.jl'    },
+  /* .NET */
+  cs:     { language: 'csharp',       version: '*', filename: 'main.cs'    },
+  fs:     { language: 'fsharp',       version: '*', filename: 'main.fs'    },
+  vb:     { language: 'vb',           version: '*', filename: 'main.vb'    },
+  /* Typed JS */
+  ts:     { language: 'typescript',   version: '*', filename: 'main.ts'    },
+  tsx:    { language: 'typescript',   version: '*', filename: 'main.tsx'   },
+  /* Shell */
+  sh:     { language: 'bash',         version: '*', filename: 'main.sh'    },
+  bash:   { language: 'bash',         version: '*', filename: 'main.sh'    },
+  zsh:    { language: 'zsh',          version: '*', filename: 'main.zsh'   },
+  fish:   { language: 'fish',         version: '*', filename: 'main.fish'  },
+  ps1:    { language: 'powershell',   version: '*', filename: 'main.ps1'   },
+  /* Functional */
+  hs:     { language: 'haskell',      version: '*', filename: 'main.hs'    },
+  ml:     { language: 'ocaml',        version: '*', filename: 'main.ml'    },
+  clj:    { language: 'clojure',      version: '*', filename: 'main.clj'   },
+  ex:     { language: 'elixir',       version: '*', filename: 'main.ex'    },
+  exs:    { language: 'elixir',       version: '*', filename: 'main.exs'   },
+  erl:    { language: 'erlang',       version: '*', filename: 'main.erl'   },
+  lisp:   { language: 'common lisp',  version: '*', filename: 'main.lisp'  },
+  scm:    { language: 'scheme',       version: '*', filename: 'main.scm'   },
+  /* Mobile / Other */
+  swift:  { language: 'swift',        version: '*', filename: 'main.swift' },
+  dart:   { language: 'dart',         version: '*', filename: 'main.dart'  },
+  cr:     { language: 'crystal',      version: '*', filename: 'main.cr'    },
+  nim:    { language: 'nim',          version: '*', filename: 'main.nim'   },
+  v:      { language: 'vlang',        version: '*', filename: 'main.v'     },
+  coffee: { language: 'coffeescript', version: '*', filename: 'main.coffee'},
+  pas:    { language: 'pascal',       version: '*', filename: 'main.pas'   },
+  asm:    { language: 'nasm',         version: '*', filename: 'main.asm'   },
+  nasm:   { language: 'nasm',         version: '*', filename: 'main.asm'   },
+  cob:    { language: 'cobol',        version: '*', filename: 'main.cob'   },
+  f90:    { language: 'fortran',      version: '*', filename: 'main.f90'   },
+  f:      { language: 'fortran',      version: '*', filename: 'main.f'     },
+  pro:    { language: 'prolog',       version: '*', filename: 'main.pro'   },
+  tcl:    { language: 'tcl',          version: '*', filename: 'main.tcl'   },
+};
+
+let _pistonRunning = false;
+
+async function _runPiston(code, ext, path) {
+  if (_pistonRunning) { toast('A run is already in progress', 'warn', 2000); return; }
+  _pistonRunning = true;
+
+  const lang = PISTON_MAP[ext];
+  const runBtn = $('#btn-run');
+  runBtn.classList.add('running');
+
+  logToConsole('info', `Engine: Piston  ·  ${lang.language}  ·  ${path}`);
+
+  try {
+    const res = await fetch(PISTON_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        language: lang.language,
+        version:  lang.version,
+        files: [{ name: lang.filename || ('main.' + ext), content: code }],
+      }),
+    });
+
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      throw new Error(`Piston HTTP ${res.status} — ${txt.slice(0, 200) || res.statusText}`);
+    }
+
+    const data = await res.json();
+
+    /* ---- compile stage (compiled languages) ---- */
+    if (data.compile) {
+      if (data.compile.stdout) {
+        data.compile.stdout.split('\n').forEach(l => { if (l.trim()) logToConsole('log', '[compile] ' + l); });
+      }
+      if (data.compile.stderr) {
+        data.compile.stderr.split('\n').forEach(l => { if (l.trim()) logToConsole('error', '[compile] ' + l); });
+      }
+      if (data.compile.code !== 0 && data.compile.code != null) {
+        logToConsole('error', `Compilation failed (exit ${data.compile.code})`);
+        return;
+      }
+    }
+
+    /* ---- run stage ---- */
+    const run = data.run || {};
+    const hasOut = (run.stdout || '').trim();
+    const hasErr = (run.stderr || '').trim();
+
+    if (hasOut) {
+      hasOut.split('\n').forEach(l => logToConsole('log', l));
+    }
+    if (hasErr) {
+      hasErr.split('\n').forEach(l => { if (l.trim()) logToConsole('error', l); });
+    }
+    if (!hasOut && !hasErr) {
+      logToConsole('log', '(no output)');
+    }
+
+    const ok = run.code === 0;
+    const sig = run.signal ? `  signal: ${run.signal}` : '';
+    logToConsole(ok ? 'success' : 'error', `Exit code: ${run.code ?? '?'}${sig}`);
+
+  } catch (e) {
+    logToConsole('error', 'Runner error: ' + e.message);
+    toast('Run failed: ' + e.message, 'error', 5000);
+  } finally {
+    runBtn.classList.remove('running');
+    _pistonRunning = false;
+  }
+}
+
 /* ---------------- Run current file ---------------- */
 function runCurrentFile() {
   const path = state.active;
@@ -2676,21 +2820,25 @@ function runCurrentFile() {
   $('#console-run-file').textContent = path;
   logToConsole('info', 'Running ' + path + ' …');
 
-  const runBtn = $('#btn-run');
-  runBtn.classList.add('running');
-  setTimeout(() => runBtn.classList.remove('running'), 1500);
-
-  if (['html','htm'].includes(ext))       { _runHtml(content, path); }
-  else if (['js','mjs','cjs','jsx'].includes(ext)) { _runJs(content, path); }
-  else if (['ts','tsx'].includes(ext)) {
-    logToConsole('warn', 'TypeScript must be transpiled before running.');
-    logToConsole('info', 'Tip: rename to .js and remove type annotations, or add a transpile step.');
-  } else if (ext === 'py') {
-    logToConsole('warn', 'Python cannot run directly in the browser.');
-    logToConsole('info', 'Tip: use Pyodide (pyodide.org) or a local terminal.');
+  if (['html', 'htm'].includes(ext)) {
+    const runBtn = $('#btn-run');
+    runBtn.classList.add('running');
+    setTimeout(() => runBtn.classList.remove('running'), 1200);
+    _runHtml(content, path);
+  } else if (['js', 'mjs', 'cjs', 'jsx'].includes(ext)) {
+    const runBtn = $('#btn-run');
+    runBtn.classList.add('running');
+    setTimeout(() => runBtn.classList.remove('running'), 1200);
+    _runJs(content, path);
+  } else if (PISTON_MAP[ext]) {
+    _runPiston(content, ext, path);
   } else {
-    logToConsole('warn', 'No runner for .' + ext + ' files.');
-    logToConsole('info', 'JS and HTML files can be executed here.');
+    const runBtn = $('#btn-run');
+    runBtn.classList.add('running');
+    setTimeout(() => runBtn.classList.remove('running'), 900);
+    logToConsole('warn', 'No runner available for .' + ext + ' files.');
+    const supported = Object.keys(PISTON_MAP).map(e => '.' + e).join('  ');
+    logToConsole('info', 'Piston supports: ' + supported);
   }
 }
 
